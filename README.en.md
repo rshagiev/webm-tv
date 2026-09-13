@@ -1,6 +1,6 @@
 # WebM TV — self-hosted 2ch video player
 
-[Русский](README.md) · [Quick start](#quick-start) · [Watch on your phone](#watch-on-your-phone)
+[Русский](README.md) · [Releases](https://github.com/rshagiev/webm-tv/releases) · [Quick start](#quick-start) · [Watch on your phone](#watch-on-your-phone)
 
 Random WebM and MP4 videos from 2ch.hk threads and replies. Choose the whole site, a board or a thread, then browse with keyboard controls or mobile swipes.
 
@@ -10,7 +10,7 @@ Random WebM and MP4 videos from 2ch.hk threads and replies. Choose the whole sit
 
 Install **[Node.js LTS](https://nodejs.org/), version 22.12 or newer**. npm comes with Node.js.
 
-1. [Download the ZIP](https://github.com/rshagiev/webm-tv/archive/refs/heads/main.zip) and extract it.
+1. [Download the ZIP](https://github.com/rshagiev/webm-tv/releases/latest/download/webm-tv.zip) and extract it.
 2. Open a terminal in the extracted folder and run:
 
 ```sh
@@ -30,6 +30,17 @@ npm start
 ```
 
 ## Watch on your phone
+
+The mobile player fills the screen. Swipe up for the next clip and down for the previous one; tap the video to pause. Open the top-left menu to choose a board, thread or collection. Browse the combined feed, then stay in a thread you like.
+
+<p>
+  <img src="docs/images/mobile.png" width="260" alt="WebM TV mobile start screen and player controls">
+  <img src="docs/images/mobile-channels.png" width="260" alt="Mobile channel browser with minimum-duration filter">
+</p>
+
+*Start screen and channel browser at a 390 px viewport width.*
+
+No phone app installation is needed. Open the site in your browser while the server runs on your computer:
 
 Connect your computer and phone to the same Wi-Fi network. The server prints addresses such as:
 

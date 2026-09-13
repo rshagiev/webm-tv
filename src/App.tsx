@@ -933,7 +933,7 @@ export default function App() {
         )}
         <footer>
           <span>Из тредов — в эфир.</span>
-          <span>WebM TV / 0.2</span>
+          <span>WebM TV / 0.2.0</span>
         </footer>
       </main>
       {drawer && (
