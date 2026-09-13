@@ -36,9 +36,13 @@ import {
 import { matchesDuration } from "./duration";
 import { DurationMenu } from "./DurationMenu";
 import { SystemControls } from "./SystemControls";
+import { radioPath, RADIO_LOW_WATER, type RadioBatch } from "../shared/radio";
+import { mergeRadioPool, RefillCursor } from "./radio-pool";
 const ROOT: Source = { kind: "root", id: "all", label: "Весь Двач" };
 export default function App() {
   const [publicMode, setPublicMode] = useState<boolean | null>(null);
+  const modeRef = useRef(publicMode);
+  modeRef.current = publicMode;
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
@@ -109,6 +113,13 @@ export default function App() {
     () => rawClips.filter((c) => matchesDuration(c, onlyLong, minimum)),
     [rawClips, onlyLong, minimum],
   );
+  const availableRef = useRef<Clip[]>([]);
+  availableRef.current = clips;
+  const boardsRef = useRef<Board[]>([]);
+  boardsRef.current = boards;
+  const hiddenRef = useRef<string[]>([]);
+  hiddenRef.current = hidden;
+  const wakeRadio = useRef<() => void>(() => {});
   const changeDuration = (enabled: boolean, seconds = minimum) => {
     playerRef.current?.feedback("leave");
     setOnlyLong(enabled);
@@ -181,9 +192,16 @@ export default function App() {
   useEffect(() => {
     let alive = true;
     let pending = false;
+    let nextRefresh = 0;
     let controller: AbortController | undefined;
     const refresh = async () => {
-      if (!alive || pending) return;
+      if (
+        !alive ||
+        pending ||
+        (modeRef.current !== false &&
+          (document.hidden || Date.now() < nextRefresh))
+      )
+        return;
       pending = true;
       controller = new AbortController();
       const timeout = setTimeout(() => controller?.abort(), 20_000);
@@ -195,6 +213,8 @@ export default function App() {
           },
         );
         if (!alive) return;
+        nextRefresh =
+          Date.now() + (d.boards.some((b) => b.videoCount) ? 60_000 : 5000);
         setBoards(d.boards);
         setTreeMinimum(filterMinimum);
         setTreeError("");
@@ -208,16 +228,22 @@ export default function App() {
         pending = false;
       }
     };
-    retryTree.current = refresh;
+    const wake = () => {
+      nextRefresh = 0;
+      void refresh();
+    };
+    retryTree.current = wake;
     setTreeError("");
     void refresh();
     const timer = setInterval(refresh, 5000);
-    window.addEventListener("online", refresh);
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("online", wake);
     return () => {
       alive = false;
       controller?.abort();
       clearInterval(timer);
-      window.removeEventListener("online", refresh);
+      window.removeEventListener("online", wake);
+      document.removeEventListener("visibilitychange", wake);
     };
   }, [filterMinimum]);
   useEffect(() => {
@@ -261,25 +287,62 @@ export default function App() {
       }
     }
     if (publicMode) {
-      const controller = new AbortController();
-      async function radio() {
+      const cursors = sources.map((source) => ({
+        source,
+        cursor: new RefillCursor(),
+      }));
+      let request: AbortController | undefined;
+      let inFlight = false,
+        nextAllowed = 0,
+        consecutiveErrors = 0,
+        turn = 0;
+      async function refill() {
+        const now = Date.now();
+        if (disposed || inFlight || document.hidden || now < nextAllowed)
+          return;
+        const hiddenIds = new Set(hiddenRef.current);
+        const remaining = availableRef.current.filter(
+          (c) =>
+            !seen.current.has(c.id) &&
+            !hiddenIds.has(c.id) &&
+            !failed.current.has(c.id),
+        ).length;
+        let selected = cursors.find((x) => !x.cursor.initialized);
+        if (!selected && remaining < RADIO_LOW_WATER) {
+          for (let i = 0; i < cursors.length; i++) {
+            const candidate = cursors[(turn + i) % cursors.length];
+            if (candidate.cursor.readyAt <= now) {
+              selected = candidate;
+              turn = (turn + i + 1) % cursors.length;
+              break;
+            }
+          }
+        }
+        if (!selected) return;
+        inFlight = true;
+        request = new AbortController();
+        const timeout = setTimeout(() => request?.abort(), 20_000);
         try {
-          const d = await api<{ clips: Clip[] }>("/radio", {
-            method: "POST",
-            signal: controller.signal,
-            body: JSON.stringify({
-              sources,
+          const d = await api<RadioBatch>(
+            radioPath(
+              selected.source,
+              selected.cursor.bucket,
               includeAdult,
-              minimum: filterMinimum,
-              exclude: [...seen.current].slice(-200),
-            }),
-          });
+              filterMinimum,
+            ),
+            { signal: request.signal },
+          );
           if (disposed) return;
+          selected.cursor.accept(
+            d.complete,
+            Date.now(),
+            d.clips.length ? 60_000 : 5000,
+          );
+          consecutiveErrors = 0;
+          nextAllowed = Date.now() + 500;
           setError("");
           setClips((old) =>
-            [
-              ...new Map([...old, ...d.clips].map((c) => [c.id, c])).values(),
-            ].slice(-400),
+            mergeRadioPool(old, d.clips, sources, boardsRef.current),
           );
           for (const c of d.clips) knownClips.current.set(c.id, c);
           while (knownClips.current.size > 1500)
@@ -300,13 +363,31 @@ export default function App() {
             },
           });
         } catch (e) {
-          if (!disposed) setError((e as Error).message);
+          if (!disposed) {
+            setError((e as Error).message);
+            nextAllowed =
+              Date.now() +
+              Math.min(60_000, 2000 * 2 ** Math.min(consecutiveErrors++, 5));
+          }
+        } finally {
+          clearTimeout(timeout);
+          inFlight = false;
         }
-        if (!disposed) timer = setTimeout(radio, 10_000);
       }
-      void radio();
+      const wake = () => {
+        void refill();
+      };
+      wakeRadio.current = wake;
+      const interval = setInterval(wake, 1000);
+      document.addEventListener("visibilitychange", wake);
+      window.addEventListener("online", wake);
+      wake();
       return () => {
-        controller.abort();
+        request?.abort();
+        clearInterval(interval);
+        wakeRadio.current = () => {};
+        document.removeEventListener("visibilitychange", wake);
+        window.removeEventListener("online", wake);
         window.removeEventListener("pagehide", cancel);
         cancel();
       };
@@ -334,6 +415,7 @@ export default function App() {
   const markSeen = (c: Clip) => {
     seen.current.add(c.id);
     save("seen", [...seen.current].slice(-10000));
+    queueMicrotask(() => wakeRadio.current());
   };
   const pick = (pool: Clip[], current?: Clip) => {
     pool = pool.filter((c) => matchesDuration(c, onlyLong, minimum));
@@ -683,6 +765,7 @@ export default function App() {
                 )
               }
               includeAdult={includeAdult}
+              publicMode={publicMode !== false}
               setAdult={changeAdult}
               onSamples={(samples) => {
                 for (const c of samples) knownClips.current.set(c.id, c);

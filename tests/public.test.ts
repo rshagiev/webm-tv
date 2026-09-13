@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { sampleRadio, validSources, PublicCache } from "../server/public.js";
+import { sampleRadio, validSources } from "../server/public.js";
 import { VideoLibrary } from "../server/library-state.js";
 import type { Board, Clip, Source } from "../shared/model.js";
 const root: Source[] = [{ kind: "root", id: "all", label: "All" }];
@@ -95,29 +95,10 @@ test("public sampling caps output and preserves adult, source, duration, and see
     "adult",
   );
 });
-test("public request validation and shared cache are bounded", () => {
+test("public request validation bounds source count and rejects unsafe thread IDs", () => {
   assert.ok(validSources(root));
   assert.ok(!validSources(Array(33).fill(root[0])));
   assert.ok(
     !validSources([{ kind: "thread", id: "../x", board: "a", label: "x" }]),
-  );
-  const cache = new PublicCache();
-  let calls = 0;
-  assert.equal(
-    cache.get("a", () => ++calls, 0),
-    1,
-  );
-  assert.equal(
-    cache.get("a", () => ++calls, 1),
-    1,
-  );
-  assert.equal(
-    cache.get("a", () => ++calls, 30001),
-    2,
-  );
-  for (let i = 0; i < 33; i++) cache.get(String(i), () => i, 30002);
-  assert.equal(
-    cache.get("a", () => ++calls, 30003),
-    3,
   );
 });

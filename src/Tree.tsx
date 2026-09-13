@@ -13,6 +13,7 @@ import type { Board, Source, Topic, Collection, Clip } from "../shared/model";
 import { sourceKey } from "../shared/model";
 import { api } from "./api";
 type Props = {
+  publicMode?: boolean;
   boards: Board[];
   minimum: number;
   selected: Source;
@@ -26,6 +27,7 @@ type Props = {
   onSamples: (clips: Clip[]) => void;
 };
 export function Tree({
+  publicMode = false,
   boards,
   minimum,
   selected,
@@ -80,13 +82,18 @@ export function Tree({
   }, [minimum]);
   useEffect(() => {
     const refresh = () => {
+      if (publicMode && document.hidden) return;
       for (const key of expanded)
         if (key.startsWith("board:")) void load(key.split(":").pop()!);
     };
     refresh();
-    const timer = setInterval(refresh, 4000);
-    return () => clearInterval(timer);
-  }, [[...expanded].join("|"), minimum]);
+    const timer = setInterval(refresh, publicMode ? 60_000 : 4000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [[...expanded].join("|"), minimum, publicMode]);
   const visibleBoards = boards.filter(
     (b) => (showAll && !minimum) || (b.videoCount || 0) > 0,
   );

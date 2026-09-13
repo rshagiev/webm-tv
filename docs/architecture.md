@@ -24,4 +24,8 @@ CI tests the foreground launch, authorization failures, shutdown and process exi
 
 ## Public mode
 
-`PUBLIC_ORIGIN` enables a read-only public service behind nginx. `/api/radio` samples at most 96 indexed clips without creating per-viewer crawl jobs. The client keeps at most 400 candidates; metadata refresh and disk persistence are shared. Local feed jobs and shutdown endpoints are disabled in public mode. See [hosting](hosting.md) for deployment, resource bounds and monitoring.
+`PUBLIC_ORIGIN` enables a read-only public service behind nginx. `GET /api/radio/:kind/:id/:bucket?adult=0&minimum=0` returns a shared batch of up to 96 indexed clips. Eight reusable buckets per branch keep URLs independent of viewer identity and watch history. Collections are merged in the browser from their constituent branches, so they do not create a combinatorial server cache. Previously opened clients can still use POST `/api/radio`, backed by these same snapshots.
+
+`server/snapshots.ts` caches both the value and its serialized JSON, bounded to 128 entries and 8 MiB of JSON. Snapshots live up to a minute (five seconds for empty results). ETags and HTTP cache headers let nginx and browsers reuse responses or revalidate without downloading an unchanged body. Registry reads are deduplicated and cached in memory; crawl concurrency remains shared.
+
+The browser retains at most 400 candidates, preserving space for each selected branch. It fetches when fewer than 24 unseen, non-hidden, non-failed candidates remain; exhausted buckets and complete small channels wait before retrying. Hidden tabs pause metadata requests. Tree and expanded-board refreshes slow to one minute once populated. Local mode retains its live polling and full feed jobs. See [hosting](hosting.md) and [performance](performance.md) for limits and measurements.

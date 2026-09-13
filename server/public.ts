@@ -11,11 +11,17 @@ if (
   throw new Error(
     "PUBLIC_ORIGIN must be an HTTPS origin without a trailing slash",
   );
-export function publicAccess(host: string, origin?: string) {
+export function publicAccess(
+  host: string,
+  origin?: string,
+  remoteAddress?: string,
+) {
   return (
     (host === new URL(publicOrigin).host &&
       (!origin || origin === publicOrigin)) ||
-    (host === "127.0.0.1:4173" && !origin)
+    (host === "127.0.0.1:4173" &&
+      (!origin ||
+        (remoteAddress === "127.0.0.1" && origin === "http://127.0.0.1:4173")))
   );
 }
 export function validSources(value: unknown): value is Source[] {
@@ -36,19 +42,6 @@ export function validSources(value: unknown): value is Source[] {
     )
   );
 }
-// Expensive catalogue work is shared and bounded; clients never launch crawlers.
-export class PublicCache {
-  private values = new Map<string, { until: number; value: unknown }>();
-  get<T>(key: string, create: () => T, now = Date.now()): T {
-    const old = this.values.get(key);
-    if (old && old.until > now) return old.value as T;
-    if (this.values.size >= 32)
-      this.values.delete(this.values.keys().next().value!);
-    const value = create();
-    this.values.set(key, { until: now + 30_000, value });
-    return value;
-  }
-}
 export function sampleRadio(
   library: VideoLibrary,
   registry: Board[],
@@ -67,6 +60,8 @@ export function sampleRadio(
         (s.kind === "category" && s.id === b.category) ||
         (s.kind === "board" && s.id === b.id),
     );
+    if (!broad && !sources.some((s) => s.kind === "thread" && s.board === b.id))
+      continue;
     for (const e of Object.values(library.data[b.id]?.topics || {})) {
       if (
         !broad &&
@@ -79,7 +74,7 @@ export function sampleRadio(
     }
   }
   const result = new Map<string, Clip>();
-  // Reservoir sampling provides a bounded response even for a single huge thread.
+  // Output is bounded even for a single huge thread.
   // Threads are shuffled first so large threads do not always dominate the batch.
   for (let i = entries.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));

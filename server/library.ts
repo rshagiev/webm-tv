@@ -80,7 +80,10 @@ async function warm() {
   } catch {
     return;
   }
-  while (Date.now() - touched < 25_000) {
+  while (
+    Date.now() - touched <
+    (process.env.PUBLIC_ORIGIN ? 180_000 : 25_000)
+  ) {
     const now = Date.now();
     const nextBoard = registry.find(
       (b) =>

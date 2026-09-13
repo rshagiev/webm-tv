@@ -123,8 +123,27 @@ export function parseBoards(data: any): Board[] {
       ),
     }));
 }
-export const boards = async () =>
-  parseBoards(await json("/index.json", 3600_000));
+let registry: Board[] | undefined;
+let registryUntil = 0;
+let registryPending: Promise<Board[]> | undefined;
+export async function boards(): Promise<Board[]> {
+  if (registry && Date.now() < registryUntil) return registry;
+  if (registryPending) return registryPending;
+  registryPending = (async () => {
+    try {
+      registry = parseBoards(await json("/index.json", 3600_000));
+      registryUntil = Date.now() + 60_000;
+      return registry;
+    } catch (error) {
+      if (!registry) throw error;
+      registryUntil = Date.now() + 30_000;
+      return registry;
+    } finally {
+      registryPending = undefined;
+    }
+  })();
+  return registryPending;
+}
 export function mediaUrl(path: unknown): string | undefined {
   if (typeof path !== "string") return;
   try {

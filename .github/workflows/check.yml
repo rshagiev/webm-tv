@@ -40,7 +40,7 @@ jobs:
       - name: Package immutable release
         run: |
           node -e 'require("fs").writeFileSync("build.json",JSON.stringify({revision:process.env.GITHUB_SHA}))'
-          tar --dereference --hard-dereference -czf /tmp/webmtv-release.tar.gz dist server shared node_modules package.json package-lock.json build.json
+          tar --dereference --hard-dereference -czf /tmp/webmtv-release.tar.gz dist server shared node_modules package.json package-lock.json build.json scripts/benchmark-radio.mjs
       - name: Deploy and verify revision
         env:
           DEPLOY_KEY: ${{ secrets.WEBMTV_DEPLOY_KEY }}
