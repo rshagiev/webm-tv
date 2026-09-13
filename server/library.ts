@@ -1,0 +1,114 @@
+import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
+import { boards, catalog, thread } from "./source.js";
+import { VideoLibrary } from "./library-state.js";
+import type { Clip, Topic, Board } from "../shared/model.js";
+export const library = new VideoLibrary();
+export const libraryReady = (async () => {
+  try {
+    const saved = JSON.parse(await readFile("data/library.json", "utf8"));
+    if (saved.version === 1) library.data = saved.boards;
+  } catch {}
+})();
+let saveTimer: ReturnType<typeof setTimeout> | undefined;
+let saving = Promise.resolve();
+function persist() {
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = undefined;
+    saving = saving
+      .then(async () => {
+        await mkdir("data", { recursive: true });
+        await writeFile(
+          "data/library.json.tmp",
+          JSON.stringify({ version: 1, boards: library.data }),
+        );
+        await rename("data/library.json.tmp", "data/library.json");
+      })
+      .catch(() => {});
+  }, 2000);
+  saveTimer.unref();
+}
+export function rememberCatalog(
+  board: string,
+  data: { topics: Topic[]; clips: Clip[] },
+) {
+  library.catalog(board, data.topics, data.clips);
+  persist();
+}
+export function rememberThread(board: string, id: string, clips: Clip[]) {
+  library.thread(board, id, clips);
+  persist();
+}
+let touched = 0,
+  running = false,
+  round = 0;
+const priority = new Set<string>();
+const retryAfter = new Map<string, number>();
+export function warmLibrary(board?: string) {
+  touched = Date.now();
+  if (board) priority.add(board);
+  if (!running) {
+    running = true;
+    void warm().finally(() => {
+      running = false;
+    });
+  }
+}
+async function warm() {
+  await libraryReady;
+  let registry: Board[] = [];
+  try {
+    registry = (await boards()).filter((b) => b.video);
+  } catch {
+    return;
+  }
+  while (Date.now() - touched < 25_000) {
+    const now = Date.now();
+    const nextBoard = registry.find(
+      (b) =>
+        (!library.data[b.id]?.at || now - library.data[b.id].at > 600_000) &&
+        (retryAfter.get(b.id) || 0) < now,
+    );
+    if (nextBoard) {
+      try {
+        rememberCatalog(nextBoard.id, await catalog(nextBoard.id));
+      } catch {
+        retryAfter.set(nextBoard.id, now + 60_000);
+      }
+    }
+    const ordered = [
+      ...registry.filter((b) => priority.has(b.id)),
+      ...registry.slice(round),
+      ...registry.slice(0, round),
+    ];
+    let found = false;
+    for (const b of ordered) {
+      const entries = Object.values(library.data[b.id]?.topics || {})
+        .filter(
+          (e) =>
+            (!e.checkedAt || now - e.checkedAt > 900_000) &&
+            (retryAfter.get(b.id + ":" + e.topic.id) || 0) < now,
+        )
+        .sort(
+          (a, b) =>
+            Number(!!a.checkedAt) - Number(!!b.checkedAt) ||
+            b.topic.opVideos - a.topic.opVideos,
+        );
+      const e = entries[0];
+      if (!e) {
+        priority.delete(b.id);
+        continue;
+      }
+      try {
+        rememberThread(b.id, e.topic.id, await thread(b.id, e.topic.id));
+      } catch (error) {
+        library.failure(b.id, e.topic.id, (error as Error).message);
+        retryAfter.set(b.id + ":" + e.topic.id, now + 60_000);
+      }
+      round = (registry.findIndex((x) => x.id === b.id) + 1) % registry.length;
+      found = true;
+      break;
+    }
+    await new Promise((r) => setTimeout(r, nextBoard || found ? 350 : 3000));
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "name": "webm-tv",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch server/index.ts",
+    "build": "tsc --noEmit && vite build",
+    "start": "node scripts/start.mjs",
+    "test": "tsx --test tests/*.test.ts",
+    "dev:ui": "vite",
+    "format": "prettier --write src server shared tests",
+    "serve": "node --import tsx server/index.ts"
+  },
+  "dependencies": {
+    "@fastify/static": "^10.1.3",
+    "fastify": "^5.0.0",
+    "he": "^1.2.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/he": "^1.2.3",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "prettier": "^3.9.6",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0"
+  },
+  "description": "Self-hosted random WebM and MP4 player for 2ch threads, with mobile swipes and LAN access.",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rshagiev/webm-tv.git"
+  },
+  "license": "MIT"
+}

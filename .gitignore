@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.cache/
+data/
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# Local development notes and design studies
+DESIGN.md
+docs/verification.md
+docs/source-research.md
+docs/original.md
+docs/personalization.md
+docs/design/
