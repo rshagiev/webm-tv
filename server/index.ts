@@ -225,6 +225,7 @@ app.setNotFoundHandler((req, reply) =>
     ? reply.code(404).send({ error: "Not found" })
     : reply.sendFile("index.html"),
 );
+await libraryReady;
 const bindHost = process.env.HOST || "0.0.0.0";
 try {
   await app.listen({ host: bindHost, port: 4173 });

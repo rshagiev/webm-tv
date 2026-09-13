@@ -1,6 +1,10 @@
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+const isolatedData = await mkdtemp(join(tmpdir(), "webmtv-smoke-"));
 import {spawn,spawnSync} from 'node:child_process';
 import assert from 'node:assert/strict';
-const child=spawn(process.execPath,['scripts/start.mjs'],{env:{...process.env,HOST:'127.0.0.1'},stdio:['ignore','pipe','pipe']});
+const child=spawn(process.execPath,['scripts/start.mjs'],{env:{...process.env, WEBMTV_DATA_DIR: isolatedData,HOST:'127.0.0.1'},stdio:['ignore','pipe','pipe']});
 let output='';
 child.stdout.on('data',b=>{output+=b;});
 child.stderr.on('data',b=>{output+=b;});

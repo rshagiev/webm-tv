@@ -1,6 +1,12 @@
+import { mkdtemp, writeFile, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+const isolatedData = await mkdtemp(join(tmpdir(), "webmtv-smoke-"));
 import {spawn} from 'node:child_process';
 import assert from 'node:assert/strict';
-const child=spawn(process.execPath,['--import','tsx','server/index.ts'],{env:{...process.env,HOST:'127.0.0.1',PUBLIC_ORIGIN:'https://webmtv.example'},stdio:['ignore','pipe','pipe']});
+const fixture = {version:1,boards:{test:{at:1,topics:{}}}};
+await writeFile(join(isolatedData,'library.json'), JSON.stringify(fixture));
+const child=spawn(process.execPath,['--import','tsx','server/index.ts'],{env:{...process.env, WEBMTV_DATA_DIR: isolatedData,HOST:'127.0.0.1',PUBLIC_ORIGIN:'https://webmtv.example'},stdio:['ignore','pipe','pipe']});
 let output='';child.stdout.on('data',b=>output+=b);child.stderr.on('data',b=>output+=b);
 try {
  const deadline=Date.now()+30000;
@@ -19,4 +25,8 @@ try {
  assert.equal((await call('radio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sources:[]})})).status,400);
  console.log('PASS: public mode, private endpoints disabled, origin guard, invalid request');
 } catch(e) { console.error(e);process.exitCode=1; }
-finally {child.kill('SIGTERM');}
+finally {
+ child.kill('SIGTERM');
+ await new Promise(resolve => { if(child.exitCode !== null) resolve(); else child.once('exit',resolve); });
+ assert.deepEqual(JSON.parse(await readFile(join(isolatedData,'library.json'),'utf8')),fixture,'fast shutdown must preserve the loaded index');
+}

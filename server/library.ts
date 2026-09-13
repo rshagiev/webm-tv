@@ -1,27 +1,35 @@
+import { resolve } from "node:path";
 import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { boards, catalog, thread } from "./source.js";
 import { VideoLibrary } from "./library-state.js";
 import type { Clip, Topic, Board } from "../shared/model.js";
+const dataDir = resolve(process.env.WEBMTV_DATA_DIR || "data");
 export const library = new VideoLibrary();
 export const libraryReady = (async () => {
   try {
-    const saved = JSON.parse(await readFile("data/library.json", "utf8"));
+    const saved = JSON.parse(
+      await readFile(resolve(dataDir, "library.json"), "utf8"),
+    );
     if (saved.version === 1) library.data = saved.boards;
   } catch {}
 })();
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let saving = Promise.resolve();
 export async function flushLibrary() {
+  await libraryReady;
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = undefined;
   saving = saving
     .then(async () => {
-      await mkdir("data", { recursive: true });
+      await mkdir(dataDir, { recursive: true });
       await writeFile(
-        "data/library.json.tmp",
+        resolve(dataDir, "library.json.tmp"),
         JSON.stringify({ version: 1, boards: library.data }),
       );
-      await rename("data/library.json.tmp", "data/library.json");
+      await rename(
+        resolve(dataDir, "library.json.tmp"),
+        resolve(dataDir, "library.json"),
+      );
     })
     .catch((error) => {
       console.error("Index persistence failed:", error);

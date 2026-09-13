@@ -1,8 +1,12 @@
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+const isolatedData = await mkdtemp(join(tmpdir(), "webmtv-smoke-"));
 import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
 const url = 'http://localhost:4173';
 async function launch() {
-  const child = spawn(process.execPath, ['scripts/desktop.mjs'], { env: { ...process.env, WEBMTV_NO_OPEN: '1', HOST: '127.0.0.1' }, stdio: 'inherit' });
+  const child = spawn(process.execPath, ['scripts/desktop.mjs'], { env: { ...process.env, WEBMTV_DATA_DIR: isolatedData, WEBMTV_NO_OPEN: '1', HOST: '127.0.0.1' }, stdio: 'inherit' });
   const result = await new Promise((resolve, reject) => { child.on('error', reject); child.on('exit', (code, signal) => resolve({ code, signal })); });
   assert.equal(result.code, 0, JSON.stringify(result));
 }

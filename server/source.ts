@@ -7,9 +7,11 @@ import {
   stat,
   unlink,
 } from "node:fs/promises";
+import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 import he from "he";
 import type { Board, Clip, Topic } from "../shared/model.js";
+const cacheDir = resolve(process.env.WEBMTV_DATA_DIR || "data", "cache");
 const HOST = process.env.SOURCE_HOST || "2ch.hk";
 if (!["2ch.hk", "2ch.su"].includes(HOST))
   throw new Error("SOURCE_HOST must be 2ch.hk or 2ch.su");
@@ -24,13 +26,13 @@ let pruning: Promise<void> | undefined;
 async function pruneCache() {
   if (pruning) return pruning;
   pruning = (async () => {
-    const files = await readdir("data/cache").catch(() => [] as string[]);
+    const files = await readdir(cacheDir).catch(() => [] as string[]);
     const entries = (
       await Promise.all(
         files
           .filter((f) => /^[a-f0-9]{64}\.json$/.test(f))
           .map(async (name) => {
-            const path = "data/cache/" + name;
+            const path = resolve(cacheDir, name);
             try {
               const info = await stat(path);
               return { path, size: info.size, time: info.mtimeMs };
@@ -75,7 +77,7 @@ export async function json(path: string, ttl = 300_000): Promise<any> {
     const key = createHash("sha256")
       .update(origin + path)
       .digest("hex");
-    const file = `data/cache/${key}.json`;
+    const file = resolve(cacheDir, `${key}.json`);
     try {
       const c = JSON.parse(await readFile(file, "utf8"));
       if (Date.now() - c.at < ttl) return c.value;
@@ -92,7 +94,7 @@ export async function json(path: string, ttl = 300_000): Promise<any> {
         throw new Error("Ответ источника слишком большой");
       return JSON.parse(text);
     });
-    await mkdir("data/cache", { recursive: true });
+    await mkdir(cacheDir, { recursive: true });
     await writeFile(file + ".tmp", JSON.stringify({ at: Date.now(), value }));
     await rename(file + ".tmp", file);
     await pruneCache().catch(() => {});
