@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   Send,
   ArrowRight,
@@ -40,6 +40,7 @@ import { SystemControls } from "./SystemControls";
 import { radioPath, RADIO_LOW_WATER, type RadioBatch } from "../shared/radio";
 import { mergeRadioPool, RefillCursor } from "./radio-pool";
 import { clipPath, sharedClipApi } from "../shared/share";
+import { playbackHistory, emptyHistory } from "./playback-history";
 const ROOT: Source = { kind: "root", id: "all", label: "Весь Двач" };
 export default function App() {
   const [publicMode, setPublicMode] = useState<boolean | null>(null);
@@ -103,9 +104,11 @@ export default function App() {
     [rawClips, setClips] = useState<Clip[]>([]),
     [error, setError] = useState(""),
     [wantPlay, setWantPlay] = useState(false);
-  const [history, setHistory] = useState<Clip[]>([]),
-    [position, setPosition] = useState(-1),
-    [toast, setToast] = useState("");
+  const [{ history, position }, dispatchHistory] = useReducer(
+    playbackHistory,
+    emptyHistory,
+  );
+  const [toast, setToast] = useState("");
   const seen = useRef(new Set(read<string[]>("seen", [])));
   const failed = useRef(new Set<string>());
   const failures = useRef(0);
@@ -189,8 +192,7 @@ export default function App() {
     setMinimum(seconds);
     setPrepared(undefined);
     const keep = clip && matchesDuration(clip, enabled, seconds);
-    setHistory(keep ? [clip] : []);
-    setPosition(keep ? 0 : -1);
+    dispatchHistory({ type: "reset", clip: keep ? clip : undefined });
     if (!keep) {
       playerRef.current?.hold();
       setWantPlay(started);
@@ -509,8 +511,7 @@ export default function App() {
     markSeen(c);
     setPrepared(undefined);
     playerRef.current?.start(c);
-    setHistory((h) => [...h.slice(0, position + 1), c].slice(-200));
-    setPosition((p) => Math.min(p + 1, 199));
+    dispatchHistory({ type: "append", clip: c });
     setWantPlay(true);
   };
   useEffect(() => {
@@ -531,7 +532,7 @@ export default function App() {
     if (position < history.length - 1) {
       const c = history[position + 1];
       playerRef.current?.start(c);
-      setPosition(position + 1);
+      dispatchHistory({ type: "move", position: position + 1 });
       setWantPlay(true);
       return;
     }
@@ -564,7 +565,7 @@ export default function App() {
   const previous = () => {
     if (position > 0) {
       playerRef.current?.start(history[position - 1]);
-      setPosition(position - 1);
+      dispatchHistory({ type: "move", position: position - 1 });
       setWantPlay(true);
     }
   };
@@ -604,19 +605,16 @@ export default function App() {
     if (first) {
       markSeen(first);
       if (!continuing) playerRef.current?.start(first);
-      setHistory([first]);
-      setPosition(0);
+      dispatchHistory({ type: "reset", clip: first });
     } else {
       playerRef.current?.hold();
-      setHistory([]);
-      setPosition(-1);
+      dispatchHistory({ type: "reset" });
     }
     setRevision((v) => v + 1);
   };
   const changeAdult = (v: boolean) => {
     setAdult(v);
-    setHistory([]);
-    setPosition(-1);
+    dispatchHistory({ type: "reset" });
     setClips([]);
     setPrepared(undefined);
     playerRef.current?.hold();
@@ -628,8 +626,7 @@ export default function App() {
       const c = sharedClip.clip;
       knownClips.current.set(c.id, c);
       markSeen(c);
-      setHistory([c]);
-      setPosition(0);
+      dispatchHistory({ type: "reset", clip: c });
       setStarted(true);
       setWantPlay(true);
       setSharedClip(undefined);

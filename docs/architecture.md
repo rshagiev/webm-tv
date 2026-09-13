@@ -37,3 +37,9 @@ Mobile actions are Share → Bookmark → Hide. Sharing creates `/watch/:board/:
 Recipients see the thread title and press Watch to start that attachment; subsequent swipes continue the normal feed. A shared 18+ attachment is labelled before playback and does not silently enable adult sources in the recipient's general feed. The direct attachment can be watched independently of their duration filter; subsequent recommendations retain their filters. Choosing a different channel cancels a pending shared-link request.
 
 The share button calls the native [Web Share API](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share) directly from the click handler, preserving user activation. Where unavailable, it copies the service link; if clipboard access is unavailable, a selectable link appears in a native HTML dialog. Cancelling the OS share sheet is silent. Source videos are not archived: a link cannot guarantee playback after the attachment disappears from the index or source.
+
+## Playback selection consistency
+
+History and its selected position update together through `src/playback-history.ts`. In the previous implementation, two advances in one React batch sliced history using the same captured position but incremented the cursor twice. The cursor could point past the last clip while the imperative player had already started a video, leaving the loading screen over audible playback. The reducer appends against its latest state and derives the cursor from the resulting history length, including the 200-item limit and navigation branches.
+
+When no clip is selected, Player invalidates pending playback promises and pauses, mutes and clears every video slot. Tests cover batched advances, history rollover, branching, resets and bounds. Mobile-size browser checks exercise repeated swipes and rapid keyboard advances; physical iPhone reproduction remains unverified.

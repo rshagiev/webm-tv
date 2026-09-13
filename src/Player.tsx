@@ -361,7 +361,22 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
       setSource(clip);
       if (wanted.current) attempt();
     } else {
-      video.current?.pause();
+      // No selected clip means no audible or pending media, including old slots.
+      generation.current++;
+      loaded.current = "";
+      for (const v of slots.current) {
+        if (!v) continue;
+        v.pause();
+        v.muted = true;
+        v.removeAttribute("src");
+        v.load();
+      }
+      urls.current = ["", "", ""];
+      setSlotView({ active: activeSlot.current, urls: ["", "", ""] });
+      setTime(0);
+      setDuration(0);
+      setPaused(true);
+      setWarmReady(false);
       setBuffering(false);
     }
     // Switching to a neighbor preserves its existing decoder and buffer.
