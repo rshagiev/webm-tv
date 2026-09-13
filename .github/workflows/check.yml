@@ -51,5 +51,5 @@ jobs:
           chmod 600 ~/.ssh/webmtv
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           ssh -i ~/.ssh/webmtv -o BatchMode=yes -o ConnectTimeout=15 webmtv-deploy@176.32.32.125 < /tmp/webmtv-release.tar.gz
-          curl --fail --retry 3 --max-time 15 https://webmtv.176-32-32-125.sslip.io/api/health > /tmp/health.json
+          curl --fail --retry 3 --max-time 15 https://webmtv.b020207d.sslip.io/api/health > /tmp/health.json
           node -e 'const h=require("/tmp/health.json");if(!h.ok || h.revision!==process.env.GITHUB_SHA)process.exit(1)'

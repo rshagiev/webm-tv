@@ -1,6 +1,6 @@
 # WebM TV — self-hosted 2ch video player
 
-[Watch online](https://webmtv.176-32-32-125.sslip.io) · [Hosting and operations](docs/hosting.md)
+[Watch online](https://webmtv.b020207d.sslip.io) · [Hosting and operations](docs/hosting.md)
 
 [Русский](README.md) · [Releases](https://github.com/rshagiev/webm-tv/releases) · [Quick start](#quick-start) · [Watch on your phone](#watch-on-your-phone)
 

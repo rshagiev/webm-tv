@@ -12,6 +12,6 @@ jobs:
     steps:
       - name: Check HTTPS and API
         run: |
-          curl --fail --retry 2 --retry-delay 10 --max-time 20 https://webmtv.176-32-32-125.sslip.io/api/health | python3 -c 'import sys,json; h=json.load(sys.stdin); assert h["ok"] and h["public"]'
-          curl --fail --retry 2 --max-time 20 https://webmtv.176-32-32-125.sslip.io/ -o /tmp/index.html
+          curl --fail --retry 2 --retry-delay 10 --max-time 20 https://webmtv.b020207d.sslip.io/api/health | python3 -c 'import sys,json; h=json.load(sys.stdin); assert h["ok"] and h["public"]'
+          curl --fail --retry 2 --max-time 20 https://webmtv.b020207d.sslip.io/ -o /tmp/index.html
           grep -q 'WebM TV' /tmp/index.html
