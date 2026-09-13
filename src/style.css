@@ -1202,6 +1202,12 @@ footer {
     gap: 15px;
   }
   .shorts-actions button {
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    padding: 0;
+    line-height: 0;
     min-width: 46px;
     min-height: 46px;
     border-radius: 50%;
@@ -1209,8 +1215,13 @@ footer {
     border: 1px solid #ffffff13;
     backdrop-filter: blur(4px);
   }
-  .shorts-actions .swipe-up {
-    transform: rotate(-90deg);
+  .shorts-actions button svg {
+    display: block;
+    width: 24px;
+    height: 24px;
+  }
+  .shorts-actions .lucide-send {
+    transform: translate(-1px, 1px);
   }
   .enable-sound {
     top: calc(86px + env(safe-area-inset-top));
