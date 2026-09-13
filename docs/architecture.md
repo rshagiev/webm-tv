@@ -6,7 +6,7 @@ One Node.js process serves a Vite-built React app and a Fastify API on port 4173
 - `server/library.ts` gradually warms a persistent metadata index while the app is open. `data/` stores metadata and JSON caches, not a video archive.
 - `server/feed.ts` creates cancellable feed jobs for selected branches. The client receives incremental results while scanning continues.
 - `server/library-state.ts` supplies counts and samples filtered by minimum duration. The tree sorts categories, boards and threads by descending matching count.
-- `src/Player.tsx` uses three video slots to retain neighboring buffers. Only the active slot contributes playback observations. Videos load directly from the source.
+- `src/Player.tsx` uses three video slots to retain neighboring buffers. Only the active slot contributes playback observations. Next-video loading waits for active playback and a four-second buffer (or a fully buffered short clip); previous buffers are retained without speculative re-downloads. Failed prepared candidates are replaced before selection. Videos load directly from the source.
 - `src/preferences.ts` maintains a small local interest profile. Watch completion, early skips, bookmarks and hides adjust thread weights; exploration and decay prevent a permanently fixed feed. No cross-user analytics are collected.
 - `src/storage.ts` keeps preferences, bookmarks and collections in browser storage. There are no accounts or device synchronization.
 

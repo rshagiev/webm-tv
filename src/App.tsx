@@ -885,6 +885,10 @@ export default function App() {
             }
             onFeedback={observe}
             onError={onError}
+            onPreloadError={(bad) => {
+              failed.current.add(bad.id);
+              if (prepared?.id === bad.id) setPrepared(pick(clips, clip));
+            }}
             onPlaying={() => {
               failures.current = 0;
             }}

@@ -21,6 +21,7 @@ import {
 import type { Clip } from "../shared/model";
 import { useStored } from "./storage";
 import { swipeRelease } from "./swipe";
+import { canWarmNeighbor } from "./media-buffer";
 import { watchDelta, type Observation, type Reason } from "./preferences";
 export type PlayerHandle = {
   start: (clip?: Clip) => void;
@@ -41,6 +42,7 @@ type Props = {
   status: string;
   busy: boolean;
   onError: () => void;
+  onPreloadError: (clip: Clip) => void;
   onPlaying: () => void;
   children?: ReactNode;
   onFeedback: (o: Observation) => void;
@@ -58,6 +60,7 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
     status,
     busy,
     onError,
+    onPreloadError,
     onPlaying,
     children,
     onFeedback,
@@ -69,6 +72,11 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
   const slots = useRef<(HTMLVideoElement | null)[]>([null, null, null]);
   const urls = useRef(["", "", ""]);
   const activeSlot = useRef(0);
+  const [warmReady, setWarmReady] = useState(false);
+  const updateWarmReady = () => {
+    const v = video.current;
+    setWarmReady(!!v && canWarmNeighbor(v, !document.hidden, wanted.current));
+  };
   const [slotView, setSlotView] = useState({ active: 0, urls: ["", "", ""] });
   const observation = useRef<{
     clip?: Clip;
@@ -199,8 +207,14 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
     feedback("leave");
     beginObservation(c);
     generation.current++;
+    setWarmReady(false);
     const cached = urls.current.indexOf(c.url);
-    const index = cached >= 0 ? cached : activeSlot.current;
+    const index =
+      cached >= 0
+        ? cached
+        : ([0, 1, 2].find(
+            (i) => i !== activeSlot.current && !urls.current[i],
+          ) ?? (activeSlot.current + 1) % 3);
     const v = slots.current[index];
     if (!v) return;
     const old = video.current;
@@ -213,12 +227,15 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
     }
     if (urls.current[index] !== c.url) {
       urls.current[index] = c.url;
+      v.preload = "auto";
       v.src = c.url;
     } else {
+      if (v.error) v.load();
       try {
         v.currentTime = 0;
       } catch {}
     }
+    v.preload = "auto";
     v.muted = volume === 0;
     v.volume = volume;
     setSlotView({ active: index, urls: [...urls.current] });
@@ -230,7 +247,8 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
     setBuffering(v.readyState < 3);
   };
   useEffect(() => {
-    // Keep three decoder/buffer slots alive: current, next and previous.
+    // Retain cached neighbors, but never download an uncached previous clip.
+    // Current playback gets the connection before any speculative next request.
     const targets = [preload?.url, previousClip?.url].filter(
       (x): x is string => !!x && x !== loaded.current,
     );
@@ -241,6 +259,14 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
     }
     for (const url of targets) {
       if (urls.current.includes(url)) continue;
+      if (
+        url !== preload?.url ||
+        !warmReady ||
+        !wantPlay ||
+        !video.current ||
+        !canWarmNeighbor(video.current, !document.hidden, wanted.current)
+      )
+        continue;
       const index = [0, 1, 2].find((i) => !reserved.has(i));
       if (index === undefined) break;
       const v = slots.current[index];
@@ -249,6 +275,7 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
       v.pause();
       v.muted = true;
       urls.current[index] = url;
+      v.preload = "auto";
       v.src = url;
     }
     // Release irrelevant files when a source changes; never fetch an archive.
@@ -260,7 +287,12 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
         urls.current[i] = "";
       }
     setSlotView({ active: activeSlot.current, urls: [...urls.current] });
-  }, [clip?.url, preload?.url, previousClip?.url]);
+  }, [clip?.url, preload?.url, previousClip?.url, warmReady, wantPlay]);
+  useEffect(() => {
+    document.addEventListener("visibilitychange", updateWarmReady);
+    return () =>
+      document.removeEventListener("visibilitychange", updateWarmReady);
+  }, []);
   const attempt = () => {
     const v = video.current;
     if (!v || !loaded.current) return;
@@ -556,7 +588,12 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
               if (index === activeSlot.current) video.current = node;
             }}
             playsInline
-            preload="auto"
+            preload={
+              slotView.active === index ||
+              (warmReady && wantPlay && slotView.urls[index] === preload?.url)
+                ? "auto"
+                : "metadata"
+            }
             aria-label={slotView.active === index ? "Видео эфира" : undefined}
             aria-hidden={slotView.active !== index}
             data-slot={index}
@@ -588,13 +625,33 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
             onPlaying={() => {
               if (index !== activeSlot.current) return;
               setBuffering(false);
+              updateWarmReady();
               onPlaying();
             }}
             onWaiting={() => {
-              if (index === activeSlot.current) setBuffering(true);
+              if (index !== activeSlot.current) return;
+              setBuffering(true);
+              setWarmReady(false);
+              // Abort an unfinished speculative request when playback starves.
+              for (let i = 0; i < 3; i++) {
+                const neighbor = slots.current[i];
+                if (
+                  i !== index &&
+                  neighbor &&
+                  neighbor.readyState < 3 &&
+                  urls.current[i]
+                ) {
+                  neighbor.removeAttribute("src");
+                  neighbor.load();
+                  urls.current[i] = "";
+                }
+              }
             }}
             onCanPlay={() => {
               if (index === activeSlot.current) setBuffering(false);
+            }}
+            onProgress={() => {
+              if (index === activeSlot.current) updateWarmReady();
             }}
             onTimeUpdate={() => {
               if (index !== activeSlot.current) return;
@@ -612,6 +669,7 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
               observation.current.duration = v.duration;
               lastTick.current = { media: v.currentTime, wall };
               setTime(v.currentTime);
+              updateWarmReady();
             }}
             onSeeking={() => {
               if (index !== activeSlot.current) return;
@@ -637,7 +695,11 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
               next();
             }}
             onError={() => {
-              if (index !== activeSlot.current) return;
+              if (index !== activeSlot.current) {
+                if (preload && urls.current[index] === preload.url)
+                  onPreloadError(preload);
+                return;
+              }
               if (clip && loaded.current === clip.url) {
                 setBuffering(false);
                 feedback("error");
