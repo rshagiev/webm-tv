@@ -6,5 +6,4 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-node scripts\start.mjs
-if errorlevel 1 pause
+start "" wscript.exe "%~dp0Start.vbs"

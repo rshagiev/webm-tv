@@ -11,15 +11,18 @@ Random WebM and MP4 videos from 2ch.hk threads and replies. Choose the whole sit
 Install **[Node.js LTS](https://nodejs.org/), version 22.12 or newer**. npm comes with Node.js.
 
 1. [Download the ZIP](https://github.com/rshagiev/webm-tv/releases/latest/download/webm-tv.zip) and extract it.
-2. Open a terminal in the extracted folder and run:
+2. On **macOS**, double-click **WebM TV.app**. On **Windows**, open **Start.vbs** or **Start.cmd**.
+3. Wait for the browser to open. No terminal window needs to stay open.
+
+The first launch installs dependencies and builds the interface, which may take a few minutes. Opening the launcher again reuses the running server. Keep the launcher inside the extracted project folder. Installation and playback require internet access.
+
+If macOS blocks the downloaded app, or you use Linux, open a terminal in the project folder and run:
 
 ```sh
 npm start
 ```
 
-The first launch installs dependencies and builds the interface. Open **http://localhost:4173**. Keep the terminal running; press `Ctrl+C` to stop.
-
-On macOS you can open `Start.command`; on Windows, `Start.cmd`. If macOS blocks the downloaded launcher, use the terminal command above. Installation and video playback require internet access.
+For this launch method, open **http://localhost:4173** and keep the terminal running. Stop the server with the power button or `Ctrl+C`.
 
 Or use Git:
 
@@ -28,6 +31,12 @@ git clone https://github.com/rshagiev/webm-tv.git
 cd webm-tv
 npm start
 ```
+
+## Power and addresses
+
+The **ⓘ** button shows this computer's URL and LAN URLs for your phone. Use the copy button, or select the address manually if clipboard access is unavailable over HTTP.
+
+The **power** button shuts down WebM TV for all connected devices. Open **WebM TV.app** / **Start.vbs** again to restart. Closing a browser tab does not stop the server. Startup logs are in `data/desktop.log`.
 
 ## Watch on your phone
 
@@ -38,18 +47,11 @@ The mobile player fills the screen. Swipe up for the next clip and down for the 
   <img src="docs/images/mobile-channels.png" width="260" alt="Mobile channel browser with minimum-duration filter">
 </p>
 
-*Start screen and channel browser at a 390 px viewport width.*
+*Mobile start screen and channel browser.*
 
-No phone app installation is needed. Open the site in your browser while the server runs on your computer:
+No phone app installation is needed. Connect your computer and phone to the same Wi-Fi network. Click **ⓘ** on the computer, then open one of the phone/LAN addresses on your phone, for example `http://192.168.1.20:4173`.
 
-Connect your computer and phone to the same Wi-Fi network. The server prints addresses such as:
-
-```text
-This computer: http://localhost:4173
-Local network: http://192.168.1.20:4173
-```
-
-Open **the Local network address printed on your computer** on your phone. The address above is an example. `localhost` on your phone refers to the phone itself.
+Use the actual address in your information panel. `localhost` and `127.0.0.1` on your phone refer to the phone itself.
 
 Keep the computer awake and the server running. If several addresses appear, use Wi-Fi/Ethernet rather than VPN. Check the computer firewall and guest-network device isolation if the connection fails.
 
@@ -73,6 +75,8 @@ The adult category is excluded from the root feed by default. Source categories 
 **Why is sound muted on my phone?** Browser autoplay policies can require a separate tap to enable audio.
 
 **Where are my bookmarks?** In this browser's local storage. Devices and different site addresses have separate settings; there is no sync.
+
+**How do I update?** Shut down WebM TV with the power button, extract the new ZIP and copy the old `data/` folder if you want to keep the index. Browser settings and bookmarks remain when using the same site address. For Git installations, stop the server, run `git pull`, then open the launcher again.
 
 **Port 4173 is busy?** WebM TV might already be running. Open http://localhost:4173 or stop the previous process.
 

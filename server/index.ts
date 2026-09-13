@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import { resolve } from "node:path";
@@ -6,6 +8,7 @@ import { createFeed, jobs } from "./feed.js";
 import {
   library,
   libraryReady,
+  flushLibrary,
   rememberCatalog,
   warmLibrary,
 } from "./library.js";
@@ -14,6 +17,7 @@ import { localHosts, permitted } from "./access.js";
 const app = Fastify({
   logger: process.env.LOG_REQUESTS === "1",
   bodyLimit: 32_768,
+  forceCloseConnections: true,
 });
 app.addHook("onRequest", async (req, reply) => {
   if (!permitted(req.headers.host || "", req.headers.origin))
@@ -24,7 +28,33 @@ app.setErrorHandler((e, _req, reply) =>
     .code(502)
     .send({ error: e instanceof Error ? e.message : "Ошибка сервера" }),
 );
-app.get("/api/health", async () => ({ ok: true }));
+const version = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+).version;
+const shutdownToken = randomUUID();
+app.get("/api/health", async () => ({ ok: true, app: "webm-tv", version }));
+app.get("/api/system", async (_req, reply) => {
+  reply.header("Cache-Control", "no-store");
+  return {
+    version,
+    localhost: "http://localhost:4173",
+    lan:
+      bindHost === "0.0.0.0"
+        ? [...localHosts()]
+            .filter((h) => h !== "localhost" && !h.startsWith("127."))
+            .map((h) => `http://${h}:4173`)
+        : [],
+    shutdownToken,
+  };
+});
+app.post("/api/shutdown", async (req, reply) => {
+  if (req.headers["x-webmtv-shutdown"] !== shutdownToken)
+    return reply.code(403).send({ error: "Откройте панель питания заново." });
+  reply.raw.once("finish", () => {
+    setTimeout(shutdown, 100);
+  });
+  return { ok: true };
+});
 app.get<{ Querystring: { minimum?: string } }>("/api/tree", async (req) => {
   const minimum = Math.max(0, Math.min(86400, Number(req.query.minimum) || 0));
   await libraryReady;
@@ -129,8 +159,17 @@ console.log(
   "\nOpen a local-network address on your phone using the same Wi-Fi.",
 );
 console.log("Keep this window open. Press Ctrl+C to stop.\n");
+let stopping = false;
 const shutdown = () => {
-  void app.close().then(() => process.exit(0));
+  if (stopping) return;
+  stopping = true;
+  for (const job of jobs.values()) job.stopped = true;
+  const deadline = setTimeout(() => process.exit(0), 5000);
+  deadline.unref();
+  void app
+    .close()
+    .then(flushLibrary)
+    .finally(() => process.exit(0));
 };
 process.once("SIGINT", shutdown);
 process.once("SIGTERM", shutdown);

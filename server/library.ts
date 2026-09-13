@@ -11,20 +11,25 @@ export const libraryReady = (async () => {
 })();
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let saving = Promise.resolve();
+export async function flushLibrary() {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = undefined;
+  saving = saving
+    .then(async () => {
+      await mkdir("data", { recursive: true });
+      await writeFile(
+        "data/library.json.tmp",
+        JSON.stringify({ version: 1, boards: library.data }),
+      );
+      await rename("data/library.json.tmp", "data/library.json");
+    })
+    .catch(() => {});
+  await saving;
+}
 function persist() {
   if (saveTimer) return;
   saveTimer = setTimeout(() => {
-    saveTimer = undefined;
-    saving = saving
-      .then(async () => {
-        await mkdir("data", { recursive: true });
-        await writeFile(
-          "data/library.json.tmp",
-          JSON.stringify({ version: 1, boards: library.data }),
-        );
-        await rename("data/library.json.tmp", "data/library.json");
-      })
-      .catch(() => {});
+    void flushLibrary();
   }, 2000);
   saveTimer.unref();
 }

@@ -6,7 +6,7 @@ if ! command -v node >/dev/null 2>&1; then
   read -r answer
   exit 1
 fi
-node scripts/start.mjs
+node scripts/desktop.mjs
 result=$?
 if [ "$result" -ne 0 ]; then
   printf "Press Enter to close…"

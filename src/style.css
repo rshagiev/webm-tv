@@ -1381,10 +1381,8 @@ footer {
 .duration-options button:hover,.duration-options button:focus {outline:none;background:#30373c;color:#f0f2f4;}
 .duration-options button[aria-checked=true]:focus {color:var(--accent);}
 
-.mobile-transport { display: none; }
 .tree-refresh-note { font-size: 12px; color: #96a1a8; gap: 10px; }
 .tree-refresh-note button { color: #f39860; flex-shrink: 0; }
-@media (max-width: 760px) { .mobile-transport { display: flex; } }
 
 @media (min-width: 761px) {
   .now-playing { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(96px, .5fr); align-items: start; }
@@ -1419,3 +1417,20 @@ footer {
   .now-playing { padding: 16px 2px; min-height: 0; }
   .now-playing .clip-detail { font-size: 9px; color: #647078; }
 }
+
+.system-controls { display: flex; gap: 4px; flex-shrink: 0; }
+.system-controls button { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 8px; color: #96a1a8; }
+.system-controls button:hover { color: #f4aa79; background: #ffffff08; }
+.system-dialog { width: min(440px, calc(100vw - 32px)); margin: auto; padding: 24px; background: #191e21; color: #d2d9dd; border: 1px solid #343c41; border-radius: 16px; box-shadow: 0 24px 80px #0008; }
+.system-dialog::backdrop { background: #0009; }
+.system-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.system-dialog h2 { margin: 0; font-size: 19px; }
+.system-dialog header button { padding: 8px; color: #96a1a8; }
+.system-dialog p { font-size: 13px; line-height: 1.6; color: #a2adb4; margin: 16px 0; }
+.system-dialog label { display: block; margin: 20px 0 8px; color: #859199; font-size: 12px; }
+.system-address { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; margin: 6px 0; background: #111618; border-radius: 8px; gap: 8px; }
+.system-address a { font-size: 14px; color: #e4e9eb; user-select: text; }
+.system-address button { display: flex; padding: 6px; color: #96a1a8; }
+.power-confirm { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 18px; width: 100%; background: #ff934818; border: 1px solid #ff934850; color: #f4aa79; border-radius: 8px; }
+.power-confirm:disabled { opacity: .45; }
+@media (max-width: 760px) { .header-actions { gap: 2px; } .system-controls { gap: 0; } .system-controls button { width: 30px; } }

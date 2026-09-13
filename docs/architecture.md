@@ -13,3 +13,11 @@ One Node.js process serves a Vite-built React app and a Fastify API on port 4173
 `npm start` uses a dependency-free Node launcher: on first launch it runs `npm ci`, builds the UI and starts the server. `npm run serve` starts an already built installation.
 
 LAN requests are accepted for the computer's current IPv4 addresses. Host and Origin checks do not replace authentication; this is intended for a trusted local network.
+
+## Desktop lifecycle
+
+`WebM TV.app` (macOS) and `Start.vbs` / `Start.cmd` (Windows) run `scripts/desktop.mjs`. It checks the health endpoint, serializes startup with a local PID lock, starts the launcher detached with output in `data/desktop.log`, waits for readiness, then opens the default browser. A second launch reuses the existing server. Node.js 22.12+ is still required; the app bundle must remain in the project directory.
+
+`GET /api/system` returns the version, local URLs and a per-process shutdown token with `Cache-Control: no-store`. `POST /api/shutdown` requires that token in a custom header and passes the usual Host/Origin checks. Shutdown stops feed jobs, closes connections, flushes the metadata index and exits the server; its launcher then exits too. There is a five-second shutdown deadline. The information and power dialogs are available on desktop and mobile.
+
+CI tests the foreground launch, authorization failures, shutdown and process exit, then background startup and duplicate-launch reuse on Windows, macOS and Linux.

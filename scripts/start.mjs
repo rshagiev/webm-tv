@@ -15,7 +15,7 @@ let stopping=false;
 for(const signal of ['SIGINT','SIGTERM']) process.on(signal,()=>{stopping=true;child?.kill(signal);});
 function run(command,args,env=process.env) {
  return new Promise((resolve,reject)=>{
-  child=spawn(command,args,{cwd:root,stdio:'inherit',env,shell:process.platform==='win32' && command==='npm.cmd'});
+  child=spawn(command,args,{cwd:root,stdio:'inherit',env,windowsHide:true,shell:process.platform==='win32' && command==='npm.cmd'});
   child.once('error',reject);
   child.once('exit',(code,signal)=>{if(stopping) resolve(false);else if(code===0) resolve(true);else reject(new Error(`Command failed (${signal || code}): ${command} ${args.join(' ')}`));});
  });

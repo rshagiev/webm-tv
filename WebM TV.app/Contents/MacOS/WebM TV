@@ -1,0 +1,9 @@
+#!/bin/sh
+ROOT=$(cd "$(dirname "$0")/../../.." && pwd)
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+if ! command -v node >/dev/null 2>&1; then
+  osascript -e 'display alert "WebM TV" message "Один раз установите Node.js LTS с nodejs.org, затем откройте WebM TV снова."'
+  open https://nodejs.org/
+  exit 1
+fi
+exec node "$ROOT/scripts/desktop.mjs"

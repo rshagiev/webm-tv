@@ -35,6 +35,7 @@ import {
 } from "./preferences";
 import { matchesDuration } from "./duration";
 import { DurationMenu } from "./DurationMenu";
+import { SystemControls } from "./SystemControls";
 const ROOT: Source = { kind: "root", id: "all", label: "Весь Двач" };
 export default function App() {
   const [personalized, setPersonalized] = useStored("personalized", true);
@@ -653,30 +654,13 @@ export default function App() {
             </div>
           </div>
           <div className="header-actions">
-            <div
-              className="header-transport mobile-transport"
-              role="group"
-              aria-label="Переключение роликов"
-            >
-              <button
-                aria-label="Назад"
-                title="Предыдущий ролик (←)"
-                disabled={position <= 0}
-                onClick={previous}
-              >
-                <ArrowLeft size={17} />
-                <span>Назад</span>
-              </button>
-              <button
-                aria-label="Дальше"
-                title="Следующий ролик (→)"
-                disabled={!clip}
-                onClick={next}
-              >
-                <span>Дальше</span>
-                <ArrowRight size={17} />
-              </button>
-            </div>
+            <SystemControls
+              onStopped={() => {
+                setStarted(false);
+                setWantPlay(false);
+                playerRef.current?.hold();
+              }}
+            />
             <button
               className="icon-button"
               aria-label="Сохранённые ролики"
@@ -933,7 +917,7 @@ export default function App() {
         )}
         <footer>
           <span>Из тредов — в эфир.</span>
-          <span>WebM TV / 0.2.0</span>
+          <span>WebM TV / 0.3.0</span>
         </footer>
       </main>
       {drawer && (
