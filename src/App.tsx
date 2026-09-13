@@ -38,6 +38,24 @@ import { DurationMenu } from "./DurationMenu";
 import { SystemControls } from "./SystemControls";
 const ROOT: Source = { kind: "root", id: "all", label: "Весь Двач" };
 export default function App() {
+  const [publicMode, setPublicMode] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const load = () =>
+      api<{ public?: boolean }>("/system")
+        .then((info) => {
+          if (!cancelled) setPublicMode(!!info.public);
+        })
+        .catch(() => {
+          if (!cancelled) timer = setTimeout(load, 3000);
+        });
+    void load();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, []);
   const [personalized, setPersonalized] = useStored("personalized", true);
   const profile = useRef<Profile>(read("interests-v1", {}));
   const observe = (o: Observation) => {
@@ -208,7 +226,7 @@ export default function App() {
     return () => clearTimeout(t);
   }, [toast]);
   useEffect(() => {
-    if (!started) return;
+    if (!started || publicMode === null) return;
     let disposed = false,
       id = "",
       timer: ReturnType<typeof setTimeout>;
@@ -242,6 +260,57 @@ export default function App() {
         if (!disposed) setError((e as Error).message);
       }
     }
+    if (publicMode) {
+      const controller = new AbortController();
+      async function radio() {
+        try {
+          const d = await api<{ clips: Clip[] }>("/radio", {
+            method: "POST",
+            signal: controller.signal,
+            body: JSON.stringify({
+              sources,
+              includeAdult,
+              minimum: filterMinimum,
+              exclude: [...seen.current].slice(-200),
+            }),
+          });
+          if (disposed) return;
+          setError("");
+          setClips((old) =>
+            [
+              ...new Map([...old, ...d.clips].map((c) => [c.id, c])).values(),
+            ].slice(-400),
+          );
+          for (const c of d.clips) knownClips.current.set(c.id, c);
+          while (knownClips.current.size > 1500)
+            knownClips.current.delete(knownClips.current.keys().next().value!);
+          setFeed({
+            id: "radio",
+            clips: d.clips,
+            issues: [],
+            progress: {
+              boardsDone: 0,
+              boardsTotal: 0,
+              threadsDone: 0,
+              threadsTotal: 0,
+              errors: 0,
+              done: false,
+              cancelled: false,
+              updated: Date.now(),
+            },
+          });
+        } catch (e) {
+          if (!disposed) setError((e as Error).message);
+        }
+        if (!disposed) timer = setTimeout(radio, 10_000);
+      }
+      void radio();
+      return () => {
+        controller.abort();
+        window.removeEventListener("pagehide", cancel);
+        cancel();
+      };
+    }
     api<{ id: string }>("/feeds", {
       method: "POST",
       body: JSON.stringify({ sources, includeAdult }),
@@ -261,7 +330,7 @@ export default function App() {
       window.removeEventListener("pagehide", cancel);
       cancel();
     };
-  }, [key, includeAdult, started, revision]);
+  }, [key, includeAdult, started, revision, publicMode, filterMinimum]);
   const markSeen = (c: Clip) => {
     seen.current.add(c.id);
     save("seen", [...seen.current].slice(-10000));
@@ -655,6 +724,7 @@ export default function App() {
           </div>
           <div className="header-actions">
             <SystemControls
+              publicMode={publicMode !== false}
               onStopped={() => {
                 setStarted(false);
                 setWantPlay(false);

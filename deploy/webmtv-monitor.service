@@ -1,0 +1,5 @@
+[Unit]
+Description=Check WebM TV and recover after three failures
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/webmtv-healthcheck

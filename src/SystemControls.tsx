@@ -3,12 +3,20 @@ import { Info, Power, X, Copy, Check } from "lucide-react";
 import { api } from "./api";
 
 type SystemInfo = {
+  public?: boolean;
+  url?: string;
   version: string;
   localhost: string;
   lan: string[];
   shutdownToken: string;
 };
-export function SystemControls({ onStopped }: { onStopped: () => void }) {
+export function SystemControls({
+  onStopped,
+  publicMode = false,
+}: {
+  onStopped: () => void;
+  publicMode?: boolean;
+}) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [panel, setPanel] = useState<"info" | "power" | null>(null);
   const [info, setInfo] = useState<SystemInfo>();
@@ -74,13 +82,15 @@ export function SystemControls({ onStopped }: { onStopped: () => void }) {
         >
           <Info size={18} />
         </button>
-        <button
-          aria-label="Выключить WebM TV"
-          title="Выключить WebM TV"
-          onClick={() => setPanel("power")}
-        >
-          <Power size={18} />
-        </button>
+        {!publicMode && (
+          <button
+            aria-label="Выключить WebM TV"
+            title="Выключить WebM TV"
+            onClick={() => setPanel("power")}
+          >
+            <Power size={18} />
+          </button>
+        )}
       </div>
       <dialog
         ref={dialog}
@@ -138,20 +148,34 @@ export function SystemControls({ onStopped }: { onStopped: () => void }) {
         ) : (
           <>
             <p className="system-version">Версия {info?.version || "…"}</p>
-            <label>На этом компьютере</label>
-            {info && <Address url={info.localhost} />}
-            <label>На телефоне в той же Wi-Fi сети</label>
-            {info?.lan.map((url) => (
-              <Address key={url} url={url} />
-            ))}
-            {info && !info.lan.length && (
-              <p>Адрес локальной сети недоступен.</p>
+            {info?.public ? (
+              <>
+                <label>Адрес сайта</label>
+                <Address url={info.url!} />
+                <p>Настройки и история просмотров хранятся в вашем браузере.</p>
+                <a href="https://github.com/rshagiev/webm-tv">
+                  Исходный код · запустить у себя
+                </a>
+              </>
+            ) : (
+              <>
+                <label>На этом компьютере</label>
+                {info && <Address url={info.localhost} />}
+                <label>На телефоне в той же Wi-Fi сети</label>
+                {info?.lan.map((url) => (
+                  <Address key={url} url={url} />
+                ))}
+                {info && !info.lan.length && (
+                  <p>Адрес локальной сети недоступен.</p>
+                )}
+                <p>
+                  На телефоне откройте адрес Wi-Fi/Ethernet. Если адресов
+                  несколько, не выбирайте VPN. Компьютер должен оставаться
+                  включённым; окно терминала не требуется при запуске через
+                  приложение.
+                </p>
+              </>
             )}
-            <p>
-              На телефоне откройте адрес Wi-Fi/Ethernet. Если адресов несколько,
-              не выбирайте VPN. Компьютер должен оставаться включённым; окно
-              терминала не требуется при запуске через приложение.
-            </p>
           </>
         )}
         {error && (

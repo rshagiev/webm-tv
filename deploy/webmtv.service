@@ -1,0 +1,37 @@
+[Unit]
+Description=WebM TV public server
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+User=webmtv
+Group=webmtv
+WorkingDirectory=/srv/webmtv/current
+EnvironmentFile=/etc/webmtv.env
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+ExecStart=/opt/webmtv-node/bin/node --max-old-space-size=320 --import tsx server/index.ts
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+MemoryHigh=420M
+MemoryMax=512M
+MemorySwapMax=256M
+CPUQuota=75%
+Nice=5
+TasksMax=64
+LimitNOFILE=4096
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/webmtv
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

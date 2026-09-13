@@ -19,3 +19,37 @@ jobs:
       - run: npm run build
       - run: node scripts/smoke.mjs
       - run: node scripts/desktop-smoke.mjs
+      - run: node scripts/public-smoke.mjs
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: check
+    runs-on: ubuntu-latest
+    concurrency:
+      group: production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm prune --omit=dev
+      - name: Package immutable release
+        run: |
+          node -e 'require("fs").writeFileSync("build.json",JSON.stringify({revision:process.env.GITHUB_SHA}))'
+          tar --dereference --hard-dereference -czf /tmp/webmtv-release.tar.gz dist server shared node_modules package.json package-lock.json build.json
+      - name: Deploy and verify revision
+        env:
+          DEPLOY_KEY: ${{ secrets.WEBMTV_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.WEBMTV_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/webmtv
+          chmod 600 ~/.ssh/webmtv
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/webmtv -o BatchMode=yes -o ConnectTimeout=15 webmtv-deploy@176.32.32.125 < /tmp/webmtv-release.tar.gz
+          curl --fail --retry 3 --max-time 15 https://webmtv.176-32-32-125.sslip.io/api/health > /tmp/health.json
+          node -e 'const h=require("/tmp/health.json");if(!h.ok || h.revision!==process.env.GITHUB_SHA)process.exit(1)'

@@ -23,14 +23,19 @@ export async function flushLibrary() {
       );
       await rename("data/library.json.tmp", "data/library.json");
     })
-    .catch(() => {});
+    .catch((error) => {
+      console.error("Index persistence failed:", error);
+    });
   await saving;
 }
 function persist() {
   if (saveTimer) return;
-  saveTimer = setTimeout(() => {
-    void flushLibrary();
-  }, 2000);
+  saveTimer = setTimeout(
+    () => {
+      void flushLibrary();
+    },
+    process.env.PUBLIC_ORIGIN ? 60_000 : 2000,
+  );
   saveTimer.unref();
 }
 export function rememberCatalog(

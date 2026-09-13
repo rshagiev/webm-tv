@@ -1,0 +1,9 @@
+[Unit]
+Description=Public web ports; preserve Amnezia Docker forwarding
+After=network.target docker.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/webmtv-firewall
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target

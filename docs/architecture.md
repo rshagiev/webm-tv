@@ -21,3 +21,7 @@ LAN requests are accepted for the computer's current IPv4 addresses. Host and Or
 `GET /api/system` returns the version, local URLs and a per-process shutdown token with `Cache-Control: no-store`. `POST /api/shutdown` requires that token in a custom header and passes the usual Host/Origin checks. Shutdown stops feed jobs, closes connections, flushes the metadata index and exits the server; its launcher then exits too. There is a five-second shutdown deadline. The information and power dialogs are available on desktop and mobile.
 
 CI tests the foreground launch, authorization failures, shutdown and process exit, then background startup and duplicate-launch reuse on Windows, macOS and Linux.
+
+## Public mode
+
+`PUBLIC_ORIGIN` enables a read-only public service behind nginx. `/api/radio` samples at most 96 indexed clips without creating per-viewer crawl jobs. The client keeps at most 400 candidates; metadata refresh and disk persistence are shared. Local feed jobs and shutdown endpoints are disabled in public mode. See [hosting](hosting.md) for deployment, resource bounds and monitoring.

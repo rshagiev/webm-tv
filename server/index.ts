@@ -14,28 +14,65 @@ import {
 } from "./library.js";
 import type { Source } from "../shared/model.js";
 import { localHosts, permitted } from "./access.js";
+import {
+  publicOrigin,
+  publicAccess,
+  validSources,
+  PublicCache,
+  sampleRadio,
+} from "./public.js";
+const publicCache = new PublicCache();
 const app = Fastify({
+  requestTimeout: 15_000,
+  connectionTimeout: 10_000,
   logger: process.env.LOG_REQUESTS === "1",
   bodyLimit: 32_768,
   forceCloseConnections: true,
 });
 app.addHook("onRequest", async (req, reply) => {
-  if (!permitted(req.headers.host || "", req.headers.origin))
+  if (
+    !(publicOrigin
+      ? publicAccess(req.headers.host || "", req.headers.origin)
+      : permitted(req.headers.host || "", req.headers.origin))
+  )
     return reply.code(403).send({ error: "Host or origin rejected" });
+  if (
+    publicOrigin &&
+    (req.url.startsWith("/api/feeds") || req.url.startsWith("/api/shutdown"))
+  )
+    return reply.code(404).send({ error: "Not found" });
 });
 app.setErrorHandler((e, _req, reply) =>
   reply
-    .code(502)
+    .code(
+      typeof (e as { statusCode?: number }).statusCode === "number"
+        ? (e as { statusCode: number }).statusCode
+        : 502,
+    )
     .send({ error: e instanceof Error ? e.message : "Ошибка сервера" }),
 );
 const version = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url), "utf8"),
 ).version;
 const shutdownToken = randomUUID();
-app.get("/api/health", async () => ({ ok: true, app: "webm-tv", version }));
+let revision = "local";
+try {
+  revision = JSON.parse(
+    readFileSync(new URL("../build.json", import.meta.url), "utf8"),
+  ).revision;
+} catch {}
+app.get("/api/health", async () => ({
+  ok: true,
+  app: "webm-tv",
+  version,
+  revision,
+  public: !!publicOrigin,
+}));
 app.get("/api/system", async (_req, reply) => {
   reply.header("Cache-Control", "no-store");
+  if (publicOrigin) return { version, public: true, url: publicOrigin };
   return {
+    public: false,
     version,
     localhost: "http://localhost:4173",
     lan:
@@ -59,7 +96,11 @@ app.get<{ Querystring: { minimum?: string } }>("/api/tree", async (req) => {
   const minimum = Math.max(0, Math.min(86400, Number(req.query.minimum) || 0));
   await libraryReady;
   warmLibrary();
-  const registry = (await boards()).map((b) => library.board(b, minimum));
+  const sourceBoards = await boards();
+  const compute = () => sourceBoards.map((b) => library.board(b, minimum));
+  const registry = publicOrigin
+    ? publicCache.get("tree:" + minimum, compute)
+    : compute();
   return {
     boards: registry,
     index: {
@@ -74,16 +115,63 @@ app.get<{ Params: { board: string }; Querystring: { minimum?: string } }>(
     if (!(await boards()).some((b) => b.id === req.params.board))
       return reply.code(404).send({ error: "Доска не найдена" });
     await libraryReady;
-    rememberCatalog(req.params.board, await catalog(req.params.board));
+    if (!publicOrigin)
+      rememberCatalog(req.params.board, await catalog(req.params.board));
     warmLibrary(req.params.board);
     return {
-      topics: library.topics(
-        req.params.board,
-        Math.max(0, Math.min(86400, Number(req.query.minimum) || 0)),
-      ),
+      topics: publicOrigin
+        ? publicCache.get(
+            "board:" +
+              req.params.board +
+              ":" +
+              (Number(req.query.minimum) || 0),
+            () =>
+              library.topics(
+                req.params.board,
+                Math.max(0, Math.min(86400, Number(req.query.minimum) || 0)),
+              ),
+          )
+        : library.topics(
+            req.params.board,
+            Math.max(0, Math.min(86400, Number(req.query.minimum) || 0)),
+          ),
     };
   },
 );
+app.post("/api/radio", async (req, reply) => {
+  if (!publicOrigin) return reply.code(404).send({ error: "Not found" });
+  const body = req.body as {
+    sources?: Source[];
+    includeAdult?: boolean;
+    minimum?: number;
+    exclude?: string[];
+  };
+  if (
+    !validSources(body?.sources) ||
+    typeof body.includeAdult !== "boolean" ||
+    (body.minimum !== undefined &&
+      (!Number.isFinite(body.minimum) ||
+        body.minimum < 0 ||
+        body.minimum > 86400)) ||
+    (body.exclude !== undefined &&
+      (!Array.isArray(body.exclude) ||
+        body.exclude.length > 200 ||
+        body.exclude.some((x) => typeof x !== "string" || x.length > 200)))
+  )
+    return reply.code(400).send({ error: "Некорректные источники" });
+  await libraryReady;
+  warmLibrary();
+  const registry = await boards();
+  const clips = sampleRadio(
+    library,
+    registry,
+    body.sources,
+    body.includeAdult,
+    body.minimum || 0,
+    new Set(body.exclude || []),
+  );
+  return { clips };
+});
 app.post("/api/feeds", async (req, reply) => {
   const b = req.body as { sources?: Source[]; includeAdult?: boolean };
   if (

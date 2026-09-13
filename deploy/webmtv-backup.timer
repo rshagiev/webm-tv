@@ -1,0 +1,8 @@
+[Unit]
+Description=Daily WebM TV index snapshot
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=30min
+[Install]
+WantedBy=timers.target
