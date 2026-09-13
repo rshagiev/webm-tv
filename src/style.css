@@ -1380,3 +1380,42 @@ footer {
 .duration-options button[aria-checked=true] {color:var(--accent);background:#ff934812;}
 .duration-options button:hover,.duration-options button:focus {outline:none;background:#30373c;color:#f0f2f4;}
 .duration-options button[aria-checked=true]:focus {color:var(--accent);}
+
+.mobile-transport { display: none; }
+.tree-refresh-note { font-size: 12px; color: #96a1a8; gap: 10px; }
+.tree-refresh-note button { color: #f39860; flex-shrink: 0; }
+@media (max-width: 760px) { .mobile-transport { display: flex; } }
+
+@media (min-width: 761px) {
+  .now-playing { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(96px, .5fr); align-items: start; }
+  .now-playing .clip-actions { justify-self: end; }
+  .now-playing .origin span { max-width: 100%; }
+  .now-playing .origin svg { flex-shrink: 0; }
+  .next-row { justify-content: flex-end; }
+}
+
+/* Controls share the dark surfaces and warm accent of the player. */
+.now-playing .header-transport { border: 0; background: transparent; overflow: visible; gap: 8px; }
+.now-playing .header-transport button {
+  border: 1px solid #323a3e; border-radius: 8px; padding: 9px 14px;
+  min-height: 40px; gap: 9px; color: #bdc6cb; background: #1b2023;
+  font-weight: 500; transition: background 140ms, border-color 140ms, color 140ms;
+}
+.now-playing .header-transport button:last-child {
+  color: #f4aa79; background: #ff934810; border-color: #ff934845;
+}
+.now-playing .header-transport button:hover:not(:disabled) { background: #272e32; border-color: #505c63; color: #f0f2f3; }
+.now-playing .header-transport button:last-child:hover:not(:disabled) { background: #ff934823; border-color: #ff934880; color: #ffc196; }
+.now-playing .header-transport button:disabled { opacity: .4; }
+.now-playing .clip-actions { gap: 8px; }
+.now-playing .clip-actions button {
+  display: flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border: 1px solid #2c3438; border-radius: 8px;
+  background: #191e20; transition: background 140ms, border-color 140ms;
+}
+.now-playing .clip-actions button:hover { background: #272e32; border-color: #505c63; color: #eef0f1; }
+.now-playing .clip-actions button.marked { color: var(--accent); background: #ff934810; border-color: #ff934845; }
+@media (min-width: 761px) {
+  .now-playing { padding: 16px 2px; min-height: 0; }
+  .now-playing .clip-detail { font-size: 9px; color: #647078; }
+}

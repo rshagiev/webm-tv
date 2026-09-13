@@ -54,6 +54,7 @@ export default function App() {
     selection: Source;
     sources: Source[];
   } | null>(null);
+  const retryTree = useRef<() => void>(() => {});
   const [treeMinimum, setTreeMinimum] = useState<number | null>(null);
   const filterMinimum = onlyLong ? minimum : 0;
   const [boards, setBoards] = useState<Board[]>([]),
@@ -160,24 +161,44 @@ export default function App() {
   }, [started, key, feed?.progress.done]);
   useEffect(() => {
     let alive = true;
-    const refresh = () =>
-      api<{ boards: Board[] }>(`/tree?minimum=${filterMinimum}`)
-        .then((d) => {
-          if (!alive) return;
-          setBoards(d.boards);
-          setTreeMinimum(filterMinimum);
-          setTreeError("");
-          for (const c of d.boards.flatMap((b) => b.samples || []))
-            knownClips.current.set(c.id, c);
-        })
-        .catch((e) => {
-          if (alive) setTreeError(e.message);
-        });
+    let pending = false;
+    let controller: AbortController | undefined;
+    const refresh = async () => {
+      if (!alive || pending) return;
+      pending = true;
+      controller = new AbortController();
+      const timeout = setTimeout(() => controller?.abort(), 20_000);
+      try {
+        const d = await api<{ boards: Board[] }>(
+          `/tree?minimum=${filterMinimum}`,
+          {
+            signal: controller.signal,
+          },
+        );
+        if (!alive) return;
+        setBoards(d.boards);
+        setTreeMinimum(filterMinimum);
+        setTreeError("");
+        for (const c of d.boards.flatMap((b) => b.samples || []))
+          knownClips.current.set(c.id, c);
+      } catch {
+        if (alive)
+          setTreeError("Не удалось обновить темы. Повторяем автоматически.");
+      } finally {
+        clearTimeout(timeout);
+        pending = false;
+      }
+    };
+    retryTree.current = refresh;
+    setTreeError("");
     void refresh();
     const timer = setInterval(refresh, 5000);
+    window.addEventListener("online", refresh);
     return () => {
       alive = false;
+      controller?.abort();
       clearInterval(timer);
+      window.removeEventListener("online", refresh);
     };
   }, [filterMinimum]);
   useEffect(() => {
@@ -563,16 +584,19 @@ export default function App() {
         </nav>
         <div className="sidebar-content">
           {durationControls}
-          {treeError ? (
-            <div className="tree-note error">
-              {treeError}
-              <button onClick={() => location.reload()}>Повторить</button>
+          {treeError && (
+            <div className="tree-note tree-refresh-note" role="status">
+              <span>{treeError}</span>
+              <button onClick={() => retryTree.current()}>Повторить</button>
             </div>
-          ) : !boards.length ? (
-            <div className="tree-note">
-              <LoaderCircle className="spin" size={16} />
-              Получаем доски Двача
-            </div>
+          )}
+          {treeMinimum === null ? (
+            !treeError && (
+              <div className="tree-note">
+                <LoaderCircle className="spin" size={16} />
+                Получаем доски Двача
+              </div>
+            )
           ) : (
             <Tree
               boards={treeMinimum === filterMinimum ? boards : []}
@@ -630,7 +654,7 @@ export default function App() {
           </div>
           <div className="header-actions">
             <div
-              className="header-transport"
+              className="header-transport mobile-transport"
               role="group"
               aria-label="Переключение роликов"
             >
@@ -802,33 +826,71 @@ export default function App() {
               </span>
             )}
           </div>
-          {clip && (
-            <div className="clip-actions">
-              <button
-                className={saved.some((s) => s.id === clip.id) ? "marked" : ""}
-                aria-label="Сохранить ролик"
-                onClick={() => bookmark(clip)}
-              >
-                {saved.some((s) => s.id === clip.id) ? (
-                  <Check size={20} />
-                ) : (
-                  <Bookmark size={20} />
-                )}
-              </button>
-              <button
-                aria-label="Скрыть ролик"
-                onClick={() => {
-                  observe({ clip, watched: 0, duration: 0, reason: "hide" });
-                  setHidden((h) => [...h, clip.id]);
-                  failed.current.add(clip.id);
-                  next();
-                  setToast("Ролик скрыт");
-                }}
-              >
-                <EyeOff size={19} />
-              </button>
-            </div>
-          )}
+          <div
+            className="header-transport"
+            role="group"
+            aria-label="Переключение роликов"
+          >
+            <button
+              aria-label="Назад"
+              title="Предыдущий ролик (←)"
+              disabled={position <= 0}
+              onClick={previous}
+            >
+              <ArrowLeft size={17} />
+              <span>Назад</span>
+            </button>
+            <button
+              aria-label="Дальше"
+              title="Следующий ролик (→)"
+              disabled={!clip}
+              onClick={next}
+            >
+              <span>Дальше</span>
+              <ArrowRight size={17} />
+            </button>
+          </div>
+          <div className="clip-actions">
+            {clip && (
+              <>
+                <button
+                  className={
+                    saved.some((s) => s.id === clip.id) ? "marked" : ""
+                  }
+                  aria-label="Сохранить ролик"
+                  onClick={() => bookmark(clip)}
+                >
+                  {saved.some((s) => s.id === clip.id) ? (
+                    <Check size={20} />
+                  ) : (
+                    <Bookmark size={20} />
+                  )}
+                </button>
+                <button
+                  aria-label="Скрыть ролик"
+                  onClick={() => {
+                    observe({ clip, watched: 0, duration: 0, reason: "hide" });
+                    setHidden((h) => [...h, clip.id]);
+                    failed.current.add(clip.id);
+                    next();
+                    setToast("Ролик скрыт");
+                  }}
+                >
+                  <EyeOff size={19} />
+                </button>
+              </>
+            )}
+            <button
+              aria-label="Обновить эфир"
+              title="Обновить эфир"
+              onClick={() => {
+                setStarted(true);
+                setRevision((x) => x + 1);
+              }}
+            >
+              <RefreshCw size={17} />
+            </button>
+          </div>
         </div>
         {returnSource && (
           <button
@@ -841,22 +903,6 @@ export default function App() {
             ← Вернуться: {returnSource.selection.label}
           </button>
         )}
-        <div className="next-row">
-          <span className="key-hint">
-            <kbd>←</kbd>
-            <kbd>→</kbd> переключить ролик
-          </span>
-          <button
-            className="quiet"
-            onClick={() => {
-              setStarted(true);
-              setRevision((x) => x + 1);
-            }}
-          >
-            <RefreshCw size={14} />
-            Обновить
-          </button>
-        </div>
         <div className="feed-status" aria-live="polite">
           {p ? (
             <>
