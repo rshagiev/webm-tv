@@ -40,6 +40,8 @@ type Props = {
   previous: () => void;
   canPrevious: boolean;
   status: string;
+  startLabel?: string;
+  startHeading?: string;
   busy: boolean;
   onError: () => void;
   onPreloadError: (clip: Clip) => void;
@@ -58,6 +60,8 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
     previous,
     canPrevious,
     status,
+    startLabel = "Смотреть",
+    startHeading = "Двач на перемешке",
     busy,
     onError,
     onPreloadError,
@@ -713,7 +717,7 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
             <div className="signal">
               <Radio size={36} strokeWidth={1} />
             </div>
-            <h2>{busy ? "Подбираем видео" : "Двач на перемешке"}</h2>
+            <h2>{busy ? "Подбираем видео" : startHeading}</h2>
             <p>{status}</p>
             {!busy && (
               <button
@@ -724,7 +728,7 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
                 }}
               >
                 <Play size={17} />
-                Смотреть
+                {startLabel}
               </button>
             )}
             {busy && <LoaderCircle className="spin" />}

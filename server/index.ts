@@ -26,6 +26,7 @@ import {
   RADIO_BUCKETS,
   type RadioBatch,
 } from "../shared/radio.js";
+import { validClipAddress } from "../shared/share.js";
 const snapshots = new Snapshots();
 function sendSnapshot<T>(
   req: FastifyRequest,
@@ -244,6 +245,33 @@ app.get<{ Params: { board: string }; Querystring: { minimum?: string } }>(
           ),
         )
       : compute();
+  },
+);
+app.get<{ Params: { board: string; thread: string; file: string } }>(
+  "/api/clips/:board/:thread/:file",
+  async (req, reply) => {
+    const { board, thread, file } = req.params;
+    if (!validClipAddress(board, thread, file))
+      return reply.code(400).send({ error: "Некорректная ссылка на ролик" });
+    await libraryReady;
+    const entry = Object.hasOwn(library.data, board)
+      ? library.data[board]
+      : undefined;
+    const clip = entry?.topics[thread]?.clips.find(
+      (c) => new URL(c.url).pathname.split("/").pop() === file,
+    );
+    if (!clip)
+      return reply
+        .code(404)
+        .send({
+          error:
+            "Ролик больше не доступен в каталоге. Можно посмотреть общий эфир.",
+        });
+    reply.header("Cache-Control", "public, max-age=60");
+    return {
+      clip,
+      adult: !!(await boards()).find((b) => b.id === board)?.adult,
+    };
   },
 );
 app.get<{

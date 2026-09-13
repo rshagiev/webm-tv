@@ -29,3 +29,11 @@ CI tests the foreground launch, authorization failures, shutdown and process exi
 `server/snapshots.ts` caches both the value and its serialized JSON, bounded to 128 entries and 8 MiB of JSON. Snapshots live up to a minute (five seconds for empty results). ETags and HTTP cache headers let nginx and browsers reuse responses or revalidate without downloading an unchanged body. Registry reads are deduplicated and cached in memory; crawl concurrency remains shared.
 
 The browser retains at most 400 candidates, preserving space for each selected branch. It fetches when fewer than 24 unseen, non-hidden, non-failed candidates remain; exhausted buckets and complete small channels wait before retrying. Hidden tabs pause metadata requests. Tree and expanded-board refreshes slow to one minute once populated. Local mode retains its live polling and full feed jobs. See [hosting](hosting.md) and [performance](performance.md) for limits and measurements.
+
+## Shared clips
+
+Mobile actions are Share → Bookmark → Hide. Sharing creates `/watch/:board/:thread/:file` on the current service origin; neither the original media URL nor viewer preferences are embedded. `GET /api/clips/:board/:thread/:file` resolves the exact attachment from the common metadata index, with strict path validation and a one-minute public cache. It does not start a separate crawl for each recipient. Missing attachments return 404, never a random substitute.
+
+Recipients see the thread title and press Watch to start that attachment; subsequent swipes continue the normal feed. A shared 18+ attachment is labelled before playback and does not silently enable adult sources in the recipient's general feed. The direct attachment can be watched independently of their duration filter; subsequent recommendations retain their filters. Choosing a different channel cancels a pending shared-link request.
+
+The share button calls the native [Web Share API](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share) directly from the click handler, preserving user activation. Where unavailable, it copies the service link; if clipboard access is unavailable, a selectable link appears in a native HTML dialog. Cancelling the OS share sheet is silent. Source videos are not archived: a link cannot guarantee playback after the attachment disappears from the index or source.

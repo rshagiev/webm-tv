@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Share2,
   ArrowRight,
   ArrowLeft,
   PanelLeftClose,
@@ -38,6 +39,7 @@ import { DurationMenu } from "./DurationMenu";
 import { SystemControls } from "./SystemControls";
 import { radioPath, RADIO_LOW_WATER, type RadioBatch } from "../shared/radio";
 import { mergeRadioPool, RefillCursor } from "./radio-pool";
+import { clipPath, sharedClipApi } from "../shared/share";
 const ROOT: Source = { kind: "root", id: "all", label: "Весь Двач" };
 export default function App() {
   const [publicMode, setPublicMode] = useState<boolean | null>(null);
@@ -109,6 +111,67 @@ export default function App() {
   const failures = useRef(0);
   const waitingForMore = useRef(false);
   const clip = history[position];
+  const [sharedClip, setSharedClip] = useState<{
+    clip: Clip;
+    adult: boolean;
+  }>();
+  const [sharedLoading, setSharedLoading] = useState(
+    location.pathname.startsWith("/watch/"),
+  );
+  const [sharedError, setSharedError] = useState("");
+  const sharedRequest = useRef<AbortController | null>(null);
+  useEffect(() => {
+    if (!location.pathname.startsWith("/watch/")) return;
+    const path = sharedClipApi(location.pathname);
+    if (!path) {
+      setSharedError("Некорректная ссылка на ролик");
+      setSharedLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    sharedRequest.current = controller;
+    const timeout = setTimeout(() => {
+      controller.abort();
+      setSharedLoading(false);
+      setSharedError(
+        "Не удалось открыть ролик. Обновите страницу или перейдите в общий эфир.",
+      );
+    }, 15000);
+    api<{ clip: Clip; adult: boolean }>(path, { signal: controller.signal })
+      .then((value) => {
+        if (!controller.signal.aborted) setSharedClip(value);
+      })
+      .catch((e) => {
+        if (!controller.signal.aborted) setSharedError(e.message);
+      })
+      .finally(() => {
+        clearTimeout(timeout);
+        if (!controller.signal.aborted) setSharedLoading(false);
+      });
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, []);
+  const [shareFallback, setShareFallback] = useState("");
+  const shareDialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (shareFallback) shareDialog.current?.showModal();
+    else shareDialog.current?.close();
+  }, [shareFallback]);
+  const shareClip = async (c: Clip) => {
+    const url = new URL(clipPath(c), location.origin).href;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "WebM TV", text: c.title, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setToast("Ссылка на ролик скопирована");
+    } catch (e) {
+      if ((e as Error).name !== "AbortError") setShareFallback(url);
+    }
+  };
   const clips = useMemo(
     () => rawClips.filter((c) => matchesDuration(c, onlyLong, minimum)),
     [rawClips, onlyLong, minimum],
@@ -506,6 +569,10 @@ export default function App() {
     }
   };
   const choose = (s: Source, list: Source[] = [s], continuing?: Clip) => {
+    sharedRequest.current?.abort();
+    setSharedLoading(false);
+    setSharedClip(undefined);
+    setSharedError("");
     setReturnSource(null);
     waitingForMore.current = false;
     failed.current.clear();
@@ -556,6 +623,19 @@ export default function App() {
     setWantPlay(true);
   };
   const play = (v: boolean) => {
+    if (v && sharedLoading) return;
+    if (v && sharedClip) {
+      const c = sharedClip.clip;
+      knownClips.current.set(c.id, c);
+      markSeen(c);
+      setHistory([c]);
+      setPosition(0);
+      setStarted(true);
+      setWantPlay(true);
+      setSharedClip(undefined);
+      playerRef.current?.start(c);
+      return;
+    }
     waitingForMore.current = false;
     if (v) {
       failures.current = 0;
@@ -870,8 +950,25 @@ export default function App() {
             next={next}
             previous={previous}
             canPrevious={position > 0}
-            busy={started && !p?.done && !error}
+            busy={sharedLoading || (started && !p?.done && !error)}
+            startHeading={
+              sharedClip
+                ? "Вам прислали ролик"
+                : sharedError
+                  ? "Ролик недоступен"
+                  : undefined
+            }
+            startLabel={
+              sharedError
+                ? "В общий эфир"
+                : sharedClip?.adult
+                  ? "Смотреть ролик · 18+"
+                  : "Смотреть"
+            }
             status={
+              (sharedLoading ? "Открываем ролик…" : "") ||
+              sharedError ||
+              sharedClip?.clip.title ||
               error ||
               (p?.done
                 ? clips.length
@@ -905,6 +1002,12 @@ export default function App() {
                   )}
                 </div>
                 <div className="shorts-actions">
+                  <button
+                    aria-label="Поделиться роликом"
+                    onClick={() => void shareClip(clip)}
+                  >
+                    <Share2 />
+                  </button>
                   <button aria-label="Закладка" onClick={() => bookmark(clip)}>
                     {saved.some((s) => s.id === clip.id) ? (
                       <Check />
@@ -927,9 +1030,6 @@ export default function App() {
                     }}
                   >
                     <EyeOff />
-                  </button>
-                  <button aria-label="Листать дальше" onClick={next}>
-                    <ArrowRight className="swipe-up" />
                   </button>
                 </div>
               </>
@@ -1311,6 +1411,28 @@ export default function App() {
           </section>
         </div>
       )}
+      <dialog
+        ref={shareDialog}
+        className="system-dialog"
+        aria-label="Поделиться роликом"
+        onCancel={() => setShareFallback("")}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <header>
+          <h2>Ссылка на ролик</h2>
+          <button aria-label="Закрыть" onClick={() => setShareFallback("")}>
+            <X size={18} />
+          </button>
+        </header>
+        <p>Скопируйте ссылку и отправьте другу.</p>
+        <input
+          className="share-address"
+          aria-label="Ссылка на ролик"
+          readOnly
+          value={shareFallback}
+          onFocus={(e) => e.target.select()}
+        />
+      </dialog>
       {toast && (
         <div className="toast" role="status">
           {toast}

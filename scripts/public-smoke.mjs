@@ -28,6 +28,11 @@ try {
  assert.equal((await call('health',{headers:{Origin:'https://evil.example'}})).status,403);
  assert.equal((await call('health',{headers:{Origin:'http://127.0.0.1:4173'}})).status,200);
  assert.equal((await call('radio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sources:[]})})).status,400);
+ const shared=await call('clips/test/1/video.mp4');
+ assert.equal(shared.status,200); assert.deepEqual((await shared.json()).clip,clip);
+ assert.equal((await call('clips/test/1/missing.mp4')).status,404);
+ assert.equal((await call('clips/test/abc/video.mp4')).status,400);
+ assert.equal((await call('clips/test/1/video.mp4',{headers:{Origin:'https://evil.example'}})).status,403);
  const path='radio/root/all/0?adult=0&minimum=0';
  const first=await call(path);assert.equal(first.status,200);
  const etag=first.headers.get('etag');assert.ok(etag);assert.match(first.headers.get('cache-control'),/public/);
