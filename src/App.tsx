@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Share2,
+  Send,
   ArrowRight,
   ArrowLeft,
   PanelLeftClose,
@@ -1006,7 +1006,7 @@ export default function App() {
                     aria-label="Поделиться роликом"
                     onClick={() => void shareClip(clip)}
                   >
-                    <Share2 />
+                    <Send />
                   </button>
                   <button aria-label="Закладка" onClick={() => bookmark(clip)}>
                     {saved.some((s) => s.id === clip.id) ? (
