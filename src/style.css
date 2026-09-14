@@ -1515,9 +1515,29 @@ footer {
 .thread-menu button { display: block; width: 100%; padding: 11px 9px; font-size: 12px; text-align: left; border-radius: 5px; }
 .thread-menu button:hover { background: #ffffff09; }
 .thread-excluded .tree-label { opacity: .5; }
-.thread-notice { display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 24px); flex-wrap: wrap; }
-.thread-notice button { font-size: 12px; padding: 6px 0; color: #f4aa79; }
-.thread-notice button:last-child { margin-left: auto; color: #8d989e; padding: 6px; }
+.thread-notice {
+  display: grid; grid-template-columns: 24px minmax(0, 1fr) auto 44px;
+  align-items: center; gap: 16px; width: max-content; max-width: calc(100vw - 32px);
+  padding: 12px 12px 12px 20px; border-radius: 14px; border: 1px solid #3b454b;
+  background: #232a2e; box-shadow: 0 8px 32px #0005, inset 0 1px #ffffff04;
+  color: #e6e7e8; text-align: left;
+}
+.thread-notice-icon { display: grid; place-items: center; color: #a0aab0; }
+.thread-notice-copy { display: grid; gap: 4px; min-width: 0; }
+.thread-notice-copy strong { font-size: 14px; line-height: 1.4; font-weight: 500; }
+.thread-notice-copy small { color: #98a3aa; font-size: 12px; line-height: 1.4; }
+.thread-notice .thread-notice-action { min-height: 44px; padding: 10px 12px; color: #f4aa79; font-size: 13px; font-weight: 500; border-radius: 8px; white-space: nowrap; }
+.thread-notice .thread-notice-action:hover { background: #f4aa790c; }
+.thread-notice .thread-notice-undo { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; color: #c5cdd2; border-radius: 9px; }
+.thread-notice .thread-notice-undo:hover { color: #fff; background: #ffffff09; }
+.thread-notice button:focus-visible { outline: 2px solid #f4aa79; outline-offset: 2px; }
+.thread-notice--excluded { grid-template-columns: 24px minmax(0, 1fr) 44px; min-width: 350px; }
+@media (max-width: 600px) {
+  .thread-notice { width: calc(100vw - 32px); max-width: 390px; min-width: 0; grid-template-columns: 24px minmax(0, 1fr) 44px; gap: 8px 12px; padding: 10px 12px; border-radius: 14px; }
+  .thread-notice .thread-notice-action { grid-row: 2; grid-column: 1 / -1; background: #f4aa790b; border: 1px solid #f4aa7912; }
+  .thread-notice .thread-notice-action:hover { background: #f4aa7915; }
+  .thread-notice-undo { grid-column: 3; grid-row: 1; }
+}
 .excluded-threads { margin: 20px 0; font-size: 13px; color: #a8b3ba; }
 .excluded-threads summary { cursor: pointer; padding: 10px 0; }
 .excluded-threads > div { display:flex; align-items:center; gap:12px; padding:10px 0; border-top:1px solid #30383c; }

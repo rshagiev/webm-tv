@@ -11,6 +11,8 @@ import {
   ChevronRight,
   ExternalLink,
   EyeOff,
+  CircleCheck,
+  Undo2,
   Layers,
   LoaderCircle,
   Menu,
@@ -144,8 +146,21 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [threadNotice, setThreadNotice] = useState<{
     kind: "hidden" | "excluded";
+    clipId?: string;
     thread: ThreadExclusion;
   }>();
+  const [noticeHovered, setNoticeHovered] = useState(false);
+  const [noticeFocused, setNoticeFocused] = useState(false);
+  useEffect(() => {
+    if (!threadNotice) {
+      setNoticeHovered(false);
+      setNoticeFocused(false);
+      return;
+    }
+    if (noticeHovered || noticeFocused) return;
+    const timer = setTimeout(() => setThreadNotice(undefined), 15000);
+    return () => clearTimeout(timer);
+  }, [threadNotice, noticeHovered, noticeFocused]);
   const seen = useRef(new Set(read<string[]>("seen", [])));
   const failed = useRef(new Set<string>());
   const failures = useRef(0);
@@ -795,6 +810,7 @@ export default function App() {
     setToast("");
     setThreadNotice({
       kind: "hidden",
+      clipId: c.id,
       thread: { board: c.board, thread: c.thread, title: c.title },
     });
   };
@@ -1661,31 +1677,49 @@ export default function App() {
       </dialog>
       {threadNotice && (
         <div
-          className="toast thread-notice"
+          className={`toast thread-notice thread-notice--${threadNotice.kind}`}
           role="status"
-          onKeyDown={(e) => e.stopPropagation()}
+          onMouseEnter={() => setNoticeHovered(true)}
+          onMouseLeave={() => setNoticeHovered(false)}
+          onFocus={() => setNoticeFocused(true)}
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget)) setNoticeFocused(false);
+          }}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === "Escape") setThreadNotice(undefined);
+          }}
         >
-          <span>
-            {threadNotice.kind === "hidden"
-              ? "Ролик скрыт"
-              : "Тред исключён из вашего эфира"}
+          <span className="thread-notice-icon" aria-hidden="true">
+            {threadNotice.kind === "hidden" ? <EyeOff size={22} /> : <CircleCheck size={24} />}
           </span>
+          <div className="thread-notice-copy">
+            <strong>{threadNotice.kind === "hidden" ? "Ролик скрыт" : "Тред исключён"}</strong>
+            {threadNotice.kind === "excluded" && <small>Больше не появится в эфире</small>}
+          </div>
+          {threadNotice.kind === "hidden" && (
+            <button className="thread-notice-action" onClick={() => excludeThread(threadNotice.thread)}>
+              Исключить весь тред
+            </button>
+          )}
           <button
-            onClick={() =>
-              threadNotice.kind === "hidden"
-                ? excludeThread(threadNotice.thread)
-                : restoreThread(threadNotice.thread)
-            }
+            className="thread-notice-undo"
+            aria-label={threadNotice.kind === "hidden" ? "Отменить скрытие ролика" : "Отменить исключение треда"}
+            title="Отменить"
+            onClick={() => {
+              if (threadNotice.kind === "excluded") restoreThread(threadNotice.thread);
+              else {
+                const id = threadNotice.clipId;
+                setHidden((items) => items.filter((item) => item !== id));
+                if (id) failed.current.delete(id);
+                setThreadNotice(undefined);
+                setToast("Ролик снова доступен в эфире");
+              }
+              setNoticeFocused(false);
+              setNoticeHovered(false);
+            }}
           >
-            {threadNotice.kind === "hidden"
-              ? "Исключить весь тред"
-              : "Отменить"}
-          </button>
-          <button
-            aria-label="Закрыть уведомление"
-            onClick={() => setThreadNotice(undefined)}
-          >
-            <X size={14} />
+            <Undo2 size={22} aria-hidden="true" />
           </button>
         </div>
       )}
