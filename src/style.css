@@ -1501,3 +1501,8 @@ footer {
  .source-notice { flex-wrap: wrap; }.source-notice p { flex: 1; }.source-notice button { margin-left: 30px; }
 }
 @media (prefers-reduced-motion: reduce) { .access-spinner { animation: none; } }
+
+.tree-label small { display: flex; align-items: center; gap: 6px; }
+.tree-index-status { display: inline-flex; flex: 0 0 auto; color: #727c82; opacity: .7; }
+.tree-index-status .spin { animation-duration: 2s; }
+@media (prefers-reduced-motion: reduce) { .tree-index-status .spin { animation: none; } }

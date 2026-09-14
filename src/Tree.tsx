@@ -8,6 +8,7 @@ import {
   Folder,
   Layers,
   LoaderCircle,
+  CircleAlert,
 } from "lucide-react";
 import type { Board, Source, Topic, Collection, Clip } from "../shared/model";
 import { sourceKey } from "../shared/model";
@@ -43,8 +44,7 @@ export function Tree({
   const [expanded, setExpanded] = useState<Set<string>>(new Set()),
     [topics, setTopics] = useState<Record<string, Topic[]>>({}),
     [errors, setErrors] = useState<Record<string, string>>({}),
-    [query, setQuery] = useState(""),
-    [showAll, setShowAll] = useState(false);
+    [query, setQuery] = useState("");
   const filterRef = useRef(minimum);
   filterRef.current = minimum;
   const loading = useRef(new Set<string>()),
@@ -95,7 +95,9 @@ export function Tree({
     };
   }, [[...expanded].join("|"), minimum, publicMode]);
   const visibleBoards = boards.filter(
-    (b) => (showAll && !minimum) || (b.videoCount || 0) > 0,
+    (b) =>
+      (b.videoCount || 0) > 0 ||
+      (!minimum && b.video && b.indexState !== "complete"),
   );
   const categoryCounts = new Map<string, number>();
   for (const b of visibleBoards) {
@@ -125,6 +127,7 @@ export function Tree({
     action: () => void,
     detail: string,
     playable = true,
+    indexState: Board["indexState"] = "pending",
   ) => {
     const key = sourceKey(source),
       active = sourceKey(selected) === key,
@@ -157,7 +160,35 @@ export function Tree({
           onClick={() => (playable ? select(source) : action())}
         >
           {source.label}
-          <small>{detail}</small>
+          <small>
+            {detail}
+            <span
+              className="tree-index-status"
+              role="img"
+              aria-label={
+                indexState === "complete"
+                  ? "Полностью проверено"
+                  : indexState === "error"
+                    ? "Не удалось завершить проверку"
+                    : "Проверка ещё не завершена"
+              }
+              title={
+                indexState === "complete"
+                  ? "Все треды проверены"
+                  : indexState === "error"
+                    ? "Есть ошибки проверки — повторим позже"
+                    : "Количество видео ещё пополняется"
+              }
+            >
+              {indexState === "complete" ? (
+                <Check size={11} />
+              ) : indexState === "error" ? (
+                <CircleAlert size={11} />
+              ) : (
+                <LoaderCircle className="spin" size={11} />
+              )}
+            </span>
+          </small>
         </button>
         {playable && (
           <button
@@ -181,14 +212,6 @@ export function Tree({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-      </div>
-      <div className="tree-tabs">
-        <button aria-pressed={!showAll} onClick={() => setShowAll(false)}>
-          С видео
-        </button>
-        <button aria-pressed={showAll} onClick={() => setShowAll(true)}>
-          Все доски
-        </button>
       </div>
       <button
         className={`root-channel ${selected.kind === "root" ? "active" : ""}`}
@@ -234,7 +257,23 @@ export function Tree({
                 true,
                 () => expand(catKey),
                 count ? `${count} видео` : "Проверяем доски",
-                count > 0,
+                true,
+                boards
+                  .filter(
+                    (b) =>
+                      b.category === category && (b.video || !!b.videoCount),
+                  )
+                  .some((b) => b.indexState === "error")
+                  ? "error"
+                  : boards
+                        .filter(
+                          (b) =>
+                            b.category === category &&
+                            (b.video || !!b.videoCount),
+                        )
+                        .every((b) => b.indexState === "complete")
+                    ? "complete"
+                    : "pending",
               )}
               {(expanded.has(catKey) || !!query) && (
                 <div>
@@ -264,8 +303,8 @@ export function Tree({
                               void load(b.id);
                             },
                             `/${b.id}/ · ${b.videoCount ? b.videoCount + " видео" : b.videoState === "empty" ? "без видео" : "проверяем"}`,
-                            !!b.videoCount ||
-                              (showAll && !minimum && b.videoState !== "empty"),
+                            true,
+                            b.indexState,
                           )}
                           {(expanded.has(key) ||
                             (!!query &&
@@ -292,7 +331,9 @@ export function Tree({
                               {list
                                 ?.filter(
                                   (t) =>
-                                    ((showAll && !minimum) || !!t.videoCount) &&
+                                    (!!t.videoCount ||
+                                      (!minimum &&
+                                        t.indexState !== "complete")) &&
                                     (!query ||
                                       `${b.name} ${b.id} ${t.title}`
                                         .toLowerCase()
@@ -320,25 +361,9 @@ export function Tree({
                                       : t.videoState === "empty"
                                         ? "без видео"
                                         : "ещё проверяем",
-                                    !!t.videoCount ||
-                                      (showAll &&
-                                        !minimum &&
-                                        t.videoState !== "empty"),
+                                    true,
+                                    t.indexState,
                                   ),
-                                )}
-                              {list &&
-                                !showAll &&
-                                list.some(
-                                  (t) =>
-                                    t.videoState === "unknown" ||
-                                    t.videoState === "error",
-                                ) && (
-                                  <button
-                                    className="tree-note scan-note"
-                                    onClick={() => setShowAll(true)}
-                                  >
-                                    Показать непроверенные треды
-                                  </button>
                                 )}
                               {list &&
                                 list.every((t) => t.videoState === "empty") && (

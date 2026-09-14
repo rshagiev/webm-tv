@@ -1,4 +1,5 @@
 export type VideoAvailability = {
+  indexState?: "pending" | "complete" | "error";
   videoCount?: number;
   videoState?: "ready" | "empty" | "unknown" | "error";
   samples?: Clip[];

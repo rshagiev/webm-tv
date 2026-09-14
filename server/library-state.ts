@@ -73,6 +73,11 @@ export class VideoLibrary {
       );
       return {
         ...e.topic,
+        indexState: e.error
+          ? "error"
+          : e.checkedAt && !e.stale
+            ? "complete"
+            : "pending",
         videoCount: clips.length,
         videoState: clips.length
           ? "ready"
@@ -91,6 +96,12 @@ export class VideoLibrary {
     const count = topics.reduce((n, t) => n + (t.videoCount || 0), 0);
     return {
       ...board,
+      indexState: topics.some((t) => t.indexState === "error")
+        ? "error"
+        : this.data[board.id]?.at &&
+            topics.every((t) => t.indexState === "complete")
+          ? "complete"
+          : "pending",
       videoCount: count,
       videoState: count
         ? "ready"
