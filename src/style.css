@@ -1548,7 +1548,7 @@ footer {
   text-shadow: none;
 }
 .thread-focus svg { flex-shrink: 0; }
-.thread-focus:hover { background: #2b3338; border-color: #899299; color: #e6e7e8; }
+.thread-focus:hover:not(:disabled) { background: #2b3338; border-color: #899299; color: #e6e7e8; }
 .thread-focus[aria-pressed="true"] { color: #f4aa79; border-color: #bc815c; background: #f4aa790d; }
-.thread-focus[aria-pressed="true"]:hover { background: #f4aa791c; border-color: #f4aa79; }
+.thread-focus[aria-pressed="true"]:hover:not(:disabled) { color: #f4aa79; background: #f4aa791c; border-color: #f4aa79; }
 .thread-focus:focus-visible { outline: 2px solid #f4aa79; outline-offset: 3px; }
