@@ -9,11 +9,16 @@ import {
   Layers,
   LoaderCircle,
   CircleAlert,
+  Ellipsis,
 } from "lucide-react";
 import type { Board, Source, Topic, Collection, Clip } from "../shared/model";
 import { sourceKey } from "../shared/model";
 import { api } from "./api";
+import { threadKey, type ThreadExclusion } from "./thread-exclusions";
 type Props = {
+  excludedThreads: ThreadExclusion[];
+  excludeThread: (t: ThreadExclusion) => void;
+  restoreThread: (t: ThreadExclusion) => void;
   publicMode?: boolean;
   boards: Board[];
   minimum: number;
@@ -28,6 +33,9 @@ type Props = {
   onSamples: (clips: Clip[]) => void;
 };
 export function Tree({
+  excludedThreads,
+  excludeThread,
+  restoreThread,
   publicMode = false,
   boards,
   minimum,
@@ -45,6 +53,22 @@ export function Tree({
     [topics, setTopics] = useState<Record<string, Topic[]>>({}),
     [errors, setErrors] = useState<Record<string, string>>({}),
     [query, setQuery] = useState("");
+  useEffect(() => {
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent && e.key !== "Escape") return;
+      for (const menu of document.querySelectorAll<HTMLDetailsElement>(
+        "details.thread-menu[open]",
+      ))
+        if (e instanceof KeyboardEvent || !menu.contains(e.target as Node))
+          menu.open = false;
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, []);
   const filterRef = useRef(minimum);
   filterRef.current = minimum;
   const loading = useRef(new Set<string>()),
@@ -132,9 +156,16 @@ export function Tree({
     const key = sourceKey(source),
       active = sourceKey(selected) === key,
       added = basket.some((s) => sourceKey(s) === key);
+    const thread =
+      source.kind === "thread"
+        ? { board: source.board!, thread: source.id, title: source.label }
+        : undefined;
+    const excluded =
+      !!thread &&
+      excludedThreads.some((t) => threadKey(t) === threadKey(thread));
     return (
       <div
-        className={`tree-row ${active ? "active" : ""} ${!playable ? "unindexed" : ""}`}
+        className={`tree-row ${excluded ? "thread-excluded" : ""} ${active ? "active" : ""} ${!playable ? "unindexed" : ""}`}
         style={{ paddingLeft: 12 + level * 14 }}
         key={key}
       >
@@ -156,12 +187,12 @@ export function Tree({
         <button
           className="tree-label"
           title={source.label}
-          disabled={!playable && !children}
+          disabled={excluded || (!playable && !children)}
           onClick={() => (playable ? select(source) : action())}
         >
           {source.label}
           <small>
-            {detail}
+            {excluded ? "Исключён из моего эфира" : detail}
             <span
               className="tree-index-status"
               role="img"
@@ -190,7 +221,35 @@ export function Tree({
             </span>
           </small>
         </button>
-        {playable && (
+        {thread && (
+          <details className="thread-menu" name="thread-actions">
+            <summary
+              aria-label={`Действия треда ${source.label}`}
+              title="Действия треда"
+            >
+              <Ellipsis size={16} />
+            </summary>
+            <div>
+              <button
+                onClick={(e) => {
+                  e.currentTarget.closest("details")!.open = false;
+                  excluded ? restoreThread(thread) : excludeThread(thread);
+                }}
+              >
+                {excluded ? "Вернуть в мой эфир" : "Исключить из моего эфира"}
+              </button>
+              <button
+                onClick={(e) => {
+                  e.currentTarget.closest("details")!.open = false;
+                  toggle(source);
+                }}
+              >
+                {added ? "Убрать из подборки" : "Добавить в подборку"}
+              </button>
+            </div>
+          </details>
+        )}
+        {playable && !thread && (
           <button
             className={`add-source ${added ? "added" : ""}`}
             aria-label={`${added ? "Убрать" : "Добавить"} ${source.label} ${added ? "из" : "в"} подборку`}

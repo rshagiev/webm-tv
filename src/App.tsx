@@ -24,7 +24,7 @@ import {
 import type { Board, Clip, Collection, Feed, Source } from "../shared/model";
 import { normalizeSources, sourceKey } from "../shared/model";
 import { api } from "./api";
-import { useStored, read, save } from "./storage";
+import { useStored, read, save, resetSettings } from "./storage";
 import { chooseClip, ignoreHotkey } from "./queue";
 import { Tree } from "./Tree";
 import { Player, type PlayerHandle } from "./Player";
@@ -43,9 +43,26 @@ import { mergeRadioPool, RefillCursor } from "./radio-pool";
 import { clipPath, sharedClipApi } from "../shared/share";
 import { playbackHistory, emptyHistory } from "./playback-history";
 import { takeReload, RELOAD_KEY } from "./reload-session";
+import {
+  threadAllowed,
+  threadKey,
+  filterHistory,
+  type ThreadExclusion,
+} from "./thread-exclusions";
 const ROOT: Source = { kind: "root", id: "all", label: "Весь Двач" };
 export default function App() {
-  const [reloadSession] = useState(takeReload);
+  const [reloadSession] = useState(() => {
+    const session = takeReload();
+    if (!session) return;
+    const exclusions = read<ThreadExclusion[]>("excludedThreads", []);
+    const filtered = filterHistory(session, (c) =>
+      threadAllowed(c, exclusions),
+    );
+    return filtered.position < 0 ? undefined : { ...session, ...filtered };
+  });
+  const resetting = useRef(false);
+  const resetDialog = useRef<HTMLDialogElement>(null);
+  const [resetError, setResetError] = useState("");
   const [publicMode, setPublicMode] = useState<boolean | null>(null);
   const modeRef = useRef(publicMode);
   modeRef.current = publicMode;
@@ -69,7 +86,7 @@ export default function App() {
   const [personalized, setPersonalized] = useStored("personalized", true);
   const profile = useRef<Profile>(read("interests-v1", {}));
   const observe = (o: Observation) => {
-    if (!personalized) return;
+    if (!personalized || resetting.current) return;
     profile.current = learn(profile.current, o);
     save("interests-v1", profile.current);
   };
@@ -100,6 +117,13 @@ export default function App() {
     [],
   );
   const [saved, setSaved] = useStored<Clip[]>("saved", []);
+  const [excludedThreads, setExcludedThreads] = useStored<ThreadExclusion[]>(
+    "excludedThreads",
+    [],
+  );
+  const excludedRef = useRef(excludedThreads);
+  excludedRef.current = excludedThreads;
+  const allowed = (c: Clip) => threadAllowed(c, excludedRef.current);
   const [hidden, setHidden] = useStored<string[]>("hidden", []);
   const [basket, setBasket] = useState<Source[]>([]),
     [name, setName] = useState(""),
@@ -118,6 +142,10 @@ export default function App() {
       : emptyHistory,
   );
   const [toast, setToast] = useState("");
+  const [threadNotice, setThreadNotice] = useState<{
+    kind: "hidden" | "excluded";
+    thread: ThreadExclusion;
+  }>();
   const seen = useRef(new Set(read<string[]>("seen", [])));
   const failed = useRef(new Set<string>());
   const failures = useRef(0);
@@ -145,6 +173,7 @@ export default function App() {
         const s = reloadState.current;
         const media = playerRef.current?.checkpoint();
         if (
+          resetting.current ||
           !s.started ||
           !s.history[s.position] ||
           media?.url !== s.history[s.position].url
@@ -232,8 +261,13 @@ export default function App() {
     }
   };
   const clips = useMemo(
-    () => rawClips.filter((c) => matchesDuration(c, onlyLong, minimum)),
-    [rawClips, onlyLong, minimum],
+    () =>
+      rawClips.filter(
+        (c) =>
+          matchesDuration(c, onlyLong, minimum) &&
+          threadAllowed(c, excludedThreads),
+      ),
+    [rawClips, onlyLong, minimum, excludedThreads],
   );
   const availableRef = useRef<Clip[]>([]);
   availableRef.current = clips;
@@ -543,7 +577,9 @@ export default function App() {
     queueMicrotask(() => wakeRadio.current());
   };
   const pick = (pool: Clip[], current?: Clip) => {
-    pool = pool.filter((c) => matchesDuration(c, onlyLong, minimum));
+    pool = pool.filter(
+      (c) => matchesDuration(c, onlyLong, minimum) && allowed(c),
+    );
     const excluded = new Set([...hidden, ...failed.current]);
     const fresh = chooseClip(
       pool,
@@ -564,6 +600,7 @@ export default function App() {
     );
   };
   const append = (c: Clip) => {
+    if (!allowed(c)) return;
     if (!matchesDuration(c, onlyLong, minimum)) {
       setToast("Ролик не подходит под выбранную длительность");
       return;
@@ -581,6 +618,7 @@ export default function App() {
       clips.some((c) => c.id === prepared.id) &&
       !seen.current.has(prepared.id) &&
       !hidden.includes(prepared.id) &&
+      allowed(prepared) &&
       !failed.current.has(prepared.id)
     )
       return;
@@ -600,7 +638,8 @@ export default function App() {
       prepared &&
       clips.some((x) => x.id === prepared.id) &&
       !failed.current.has(prepared.id) &&
-      !hidden.includes(prepared.id)
+      !hidden.includes(prepared.id) &&
+      allowed(prepared)
         ? prepared
         : pick(clips, clip);
     if (c) append(c);
@@ -650,7 +689,9 @@ export default function App() {
       );
     });
     const first =
-      continuing && matchesDuration(continuing, onlyLong, minimum)
+      continuing &&
+      allowed(continuing) &&
+      matchesDuration(continuing, onlyLong, minimum)
         ? continuing
         : pick(pool);
     setSelection(s);
@@ -684,6 +725,12 @@ export default function App() {
     if (v && sharedLoading) return;
     if (v && sharedClip) {
       const c = sharedClip.clip;
+      if (!allowed(c)) {
+        setToast(
+          "Этот тред исключён из вашего эфира. Вернуть его можно в Источниках.",
+        );
+        return;
+      }
       knownClips.current.set(c.id, c);
       markSeen(c);
       dispatchHistory({ type: "reset", clip: c });
@@ -704,6 +751,52 @@ export default function App() {
     } else playerRef.current?.hold();
     setStarted(true);
     setWantPlay(v);
+  };
+  const restoreThread = (t: ThreadExclusion) => {
+    const updated = excludedRef.current.filter(
+      (x) => threadKey(x) !== threadKey(t),
+    );
+    excludedRef.current = updated;
+    setExcludedThreads(updated);
+    save("excludedThreads", updated);
+    setThreadNotice(undefined);
+    setToast("Тред возвращён в ваш эфир");
+  };
+  const excludeThread = (t: ThreadExclusion) => {
+    const updated = [
+      ...excludedRef.current.filter((x) => threadKey(x) !== threadKey(t)),
+      t,
+    ];
+    excludedRef.current = updated;
+    setExcludedThreads(updated);
+    save("excludedThreads", updated);
+    setPrepared(undefined);
+    if (clip && !allowed(clip)) playerRef.current?.hold();
+    dispatchHistory({ type: "filter", allowed });
+    if (
+      selection.kind === "thread" &&
+      selection.board === t.board &&
+      selection.id === t.thread
+    )
+      choose(ROOT);
+    setToast("");
+    setThreadNotice({ kind: "excluded", thread: t });
+  };
+  const hideClip = (c: Clip) => {
+    observe({ clip: c, watched: 0, duration: 0, reason: "hide" });
+    setHidden((h) => [...h, c.id]);
+    failed.current.add(c.id);
+    playerRef.current?.hold();
+    setPrepared(undefined);
+    dispatchHistory({
+      type: "filter",
+      allowed: (x) => x.id !== c.id && allowed(x),
+    });
+    setToast("");
+    setThreadNotice({
+      kind: "hidden",
+      thread: { board: c.board, thread: c.thread, title: c.title },
+    });
   };
   const stayInThread = () => {
     if (!clip || selection.kind === "thread") return;
@@ -888,6 +981,9 @@ export default function App() {
             )
           ) : (
             <Tree
+              excludedThreads={excludedThreads}
+              excludeThread={excludeThread}
+              restoreThread={restoreThread}
               boards={treeMinimum === filterMinimum ? boards : []}
               minimum={filterMinimum}
               selected={selection}
@@ -1082,17 +1178,7 @@ export default function App() {
                   </button>
                   <button
                     aria-label="Не показывать ролик"
-                    onClick={() => {
-                      observe({
-                        clip,
-                        watched: 0,
-                        duration: 0,
-                        reason: "hide",
-                      });
-                      setHidden((h) => [...h, clip.id]);
-                      failed.current.add(clip.id);
-                      next();
-                    }}
+                    onClick={() => hideClip(clip)}
                   >
                     <EyeOff />
                   </button>
@@ -1174,13 +1260,7 @@ export default function App() {
                 </button>
                 <button
                   aria-label="Скрыть ролик"
-                  onClick={() => {
-                    observe({ clip, watched: 0, duration: 0, reason: "hide" });
-                    setHidden((h) => [...h, clip.id]);
-                    failed.current.add(clip.id);
-                    next();
-                    setToast("Ролик скрыт");
-                  }}
+                  onClick={() => hideClip(clip)}
                 >
                   <EyeOff size={19} />
                 </button>
@@ -1302,6 +1382,15 @@ export default function App() {
                 >
                   Сбросить интересы
                 </button>
+                <button
+                  className="quiet"
+                  onClick={() => {
+                    setResetError("");
+                    resetDialog.current?.showModal();
+                  }}
+                >
+                  Сбросить настройки
+                </button>
                 <p className="muted">
                   Категория → доска → тред. Название включает эфир, стрелка
                   раскрывает ветку.
@@ -1358,7 +1447,8 @@ export default function App() {
                 <h3>Объединить треды и ветки</h3>
                 {basket.length === 0 ? (
                   <p className="muted">
-                    Отметьте источники кнопкой + в дереве каналов.
+                    Отметьте источники кнопкой + в дереве. Для тредов — ⋯ →
+                    Добавить в подборку.
                   </p>
                 ) : (
                   basket.map((s) => (
@@ -1424,6 +1514,26 @@ export default function App() {
                     ))}
                   </>
                 )}
+                {excludedThreads.length > 0 && (
+                  <details className="excluded-threads">
+                    <summary>
+                      Исключённые треды · {excludedThreads.length}
+                    </summary>
+                    {excludedThreads.map((t) => (
+                      <div key={threadKey(t)}>
+                        <span>
+                          /{t.board}/ · {t.title}
+                        </span>
+                        <button
+                          onClick={() => restoreThread(t)}
+                          aria-label={`Вернуть тред ${t.title}`}
+                        >
+                          Вернуть
+                        </button>
+                      </div>
+                    ))}
+                  </details>
+                )}
                 {hidden.length > 0 && (
                   <button
                     className="quiet"
@@ -1456,6 +1566,12 @@ export default function App() {
                   <button
                     className="text-button"
                     onClick={() => {
+                      if (!allowed(c)) {
+                        setToast(
+                          "Этот тред исключён. Вернуть его можно в Источниках.",
+                        );
+                        return;
+                      }
                       append(c);
                       setWantPlay(true);
                       setDrawer(null);
@@ -1478,6 +1594,43 @@ export default function App() {
         </div>
       )}
       <dialog
+        ref={resetDialog}
+        className="system-dialog"
+        aria-labelledby="reset-settings-title"
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <h2 id="reset-settings-title">Сбросить настройки?</h2>
+        <p>
+          Скрытые ролики и исключённые треды вернутся. Подборки, история
+          просмотров и интересов будут удалены. Фильтры, громкость и
+          персонализация вернутся к исходным значениям, 18+ выключится.
+        </p>
+        <p>Закладки сохранятся. Сброс действует только в этом браузере.</p>
+        {resetError && <p role="alert">{resetError}</p>}
+        <div className="reset-actions">
+          <button autoFocus onClick={() => resetDialog.current?.close()}>
+            Отмена
+          </button>
+          <button
+            onClick={() => {
+              try {
+                resetting.current = true;
+                resetSettings();
+                sessionStorage.removeItem(RELOAD_KEY);
+                window.location.replace("/");
+              } catch {
+                resetting.current = false;
+                setResetError(
+                  "Не удалось очистить настройки. Проверьте доступ браузера к хранилищу и повторите.",
+                );
+              }
+            }}
+          >
+            Сбросить
+          </button>
+        </div>
+      </dialog>
+      <dialog
         ref={shareDialog}
         className="system-dialog"
         aria-label="Поделиться роликом"
@@ -1499,7 +1652,33 @@ export default function App() {
           onFocus={(e) => e.target.select()}
         />
       </dialog>
-      {toast && (
+      {threadNotice && (
+        <div className="toast thread-notice" role="status">
+          <span>
+            {threadNotice.kind === "hidden"
+              ? "Ролик скрыт"
+              : "Тред исключён из вашего эфира"}
+          </span>
+          <button
+            onClick={() =>
+              threadNotice.kind === "hidden"
+                ? excludeThread(threadNotice.thread)
+                : restoreThread(threadNotice.thread)
+            }
+          >
+            {threadNotice.kind === "hidden"
+              ? "Исключить весь тред"
+              : "Отменить"}
+          </button>
+          <button
+            aria-label="Закрыть уведомление"
+            onClick={() => setThreadNotice(undefined)}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+      {toast && !threadNotice && (
         <div className="toast" role="status">
           {toast}
         </div>

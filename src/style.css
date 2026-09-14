@@ -1506,3 +1506,23 @@ footer {
 .tree-index-status { display: inline-flex; flex: 0 0 auto; color: #727c82; opacity: .7; }
 .tree-index-status .spin { animation-duration: 2s; }
 @media (prefers-reduced-motion: reduce) { .tree-index-status .spin { animation: none; } }
+
+.thread-menu { position: relative; flex-shrink: 0; margin-left: auto; }
+.thread-menu summary { display: grid; place-items: center; width: 30px; height: 32px; color: #89959d; cursor: pointer; list-style: none; border-radius: 6px; }
+.thread-menu summary::-webkit-details-marker { display: none; }
+.thread-menu summary:hover, .thread-menu[open] summary { background: #ffffff0a; color: #d1d7db; }
+.thread-menu > div { position: absolute; z-index: 40; right: 0; top: 100%; width: 214px; padding: 5px; border: 1px solid #394248; border-radius: 9px; background: #202629; box-shadow: 0 8px 24px #0006; }
+.thread-menu button { display: block; width: 100%; padding: 11px 9px; font-size: 12px; text-align: left; border-radius: 5px; }
+.thread-menu button:hover { background: #ffffff09; }
+.thread-excluded .tree-label { opacity: .5; }
+.thread-notice { display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 24px); flex-wrap: wrap; }
+.thread-notice button { font-size: 12px; padding: 6px 0; color: #f4aa79; }
+.thread-notice button:last-child { margin-left: auto; color: #8d989e; padding: 6px; }
+.excluded-threads { margin: 20px 0; font-size: 13px; color: #a8b3ba; }
+.excluded-threads summary { cursor: pointer; padding: 10px 0; }
+.excluded-threads > div { display:flex; align-items:center; gap:12px; padding:10px 0; border-top:1px solid #30383c; }
+.excluded-threads span { flex:1; overflow-wrap:anywhere; font-size:12px; }
+.excluded-threads button { color:#f4aa79; font-size:12px; padding:8px; }
+.tree-row:has(.thread-menu[open]) { padding-bottom: 86px; }
+
+.reset-actions { display: flex; justify-content: flex-end; gap: 16px; }

@@ -93,3 +93,11 @@ The tree has one mode: include unread branches, hide fully checked empty branche
 ## Quick reload recovery
 
 On pagehide only, the current tab writes a bounded playback snapshot to sessionStorage: history/cursor, selected sources, current active media time, and playback intent. No timeupdate persistence or periodic tracking is added. Initialization consumes a same-path snapshot no older than five minutes; malformed, expired, or other-path snapshots are discarded. The player applies the saved offset once, on metadata for the matching clip, clamps it to duration, and drops the pending seek when the selected clip changes. Paused playback stays paused; browser autoplay rules still apply to playing snapshots. This is reload recovery, not durable watch history or crash recovery.
+
+## Personal thread exclusions
+
+`excludedThreads` stores board/thread identities and display titles in this browser's localStorage. The shared metadata index and other viewers are unchanged. Exclusions filter candidate selection, refill availability and prepared media; history is pruned atomically, and a blocked current clip is stopped and cleared. Excluding a directly selected thread returns to the root feed. Reload recovery filters its saved history against current exclusions; explicit shared links also respect them. The eye button still hides one clip immediately and offers a persistent, dismissible “exclude thread” action. Thread rows expose an explicit details menu; excluded rows stay identifiable and can be restored there or in Sources. Undo restores the thread, not a previously hidden individual clip.
+
+## Local settings reset
+
+Sources offers a confirmed settings reset. It removes only localStorage keys prefixed with `webmtv:`, preserving `webmtv:saved` bookmarks and unrelated origin data. This clears collections, hidden clips, excluded threads, interests, seen clips, filters and volume. It removes the current tab's reload checkpoint and navigates to the root to initialize defaults. A synchronous reset guard suppresses playback observations and pagehide checkpoint recovery during navigation, preventing the previous feed from being restored. Storage failures are shown in the confirmation dialog.

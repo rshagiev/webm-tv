@@ -1,6 +1,8 @@
 import type { Clip } from "../shared/model";
 export type PlaybackHistory = { history: Clip[]; position: number };
+import { filterHistory } from "./thread-exclusions";
 export type HistoryAction =
+  | { type: "filter"; allowed: (c: Clip) => boolean }
   | { type: "append"; clip: Clip }
   | { type: "reset"; clip?: Clip }
   | { type: "move"; position: number };
@@ -9,6 +11,7 @@ export function playbackHistory(
   state: PlaybackHistory,
   action: HistoryAction,
 ): PlaybackHistory {
+  if (action.type === "filter") return filterHistory(state, action.allowed);
   if (action.type === "reset")
     return action.clip ? { history: [action.clip], position: 0 } : emptyHistory;
   if (action.type === "move")
