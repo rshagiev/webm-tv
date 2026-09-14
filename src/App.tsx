@@ -36,6 +36,7 @@ import {
 } from "./preferences";
 import { matchesDuration } from "./duration";
 import { DurationMenu } from "./DurationMenu";
+import { SourceAccess } from "./SourceAccess";
 import { SystemControls } from "./SystemControls";
 import { radioPath, RADIO_LOW_WATER, type RadioBatch } from "../shared/radio";
 import { mergeRadioPool, RefillCursor } from "./radio-pool";
@@ -1173,6 +1174,7 @@ export default function App() {
             </button>
           </div>
         )}
+        <SourceAccess />
         <footer>
           <span>Из тредов — в эфир.</span>
           <span>WebM TV / 0.3.0</span>

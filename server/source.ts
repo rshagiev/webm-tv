@@ -10,6 +10,7 @@ import {
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 import he from "he";
+import { sourceSession } from "./source-session.js";
 import type { Board, Clip, Topic } from "../shared/model.js";
 const cacheDir = resolve(process.env.WEBMTV_DATA_DIR || "data", "cache");
 const HOST = process.env.SOURCE_HOST || "2ch.hk";
@@ -72,10 +73,12 @@ async function limited<T>(fn: () => Promise<T>): Promise<T> {
 export async function json(path: string, ttl = 300_000): Promise<any> {
   if (!/^\/[a-zA-Z0-9/_.-]+\.json$/.test(path))
     throw new Error("Invalid source path");
-  if (pending.has(path)) return pending.get(path);
+  const session = await sourceSession();
+  const requestKey = `${session.cacheScope}:${path}`;
+  if (pending.has(requestKey)) return pending.get(requestKey);
   const task = (async () => {
     const key = createHash("sha256")
-      .update(origin + path)
+      .update(origin + path + ":" + session.cacheScope)
       .digest("hex");
     const file = resolve(cacheDir, `${key}.json`);
     try {
@@ -85,14 +88,22 @@ export async function json(path: string, ttl = 300_000): Promise<any> {
     const value = await limited(async () => {
       const response = await fetch(origin + path, {
         signal: AbortSignal.timeout(15_000),
-        headers: { Accept: "application/json", "User-Agent": "WebM-TV/0.1" },
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "WebM-TV/0.1",
+          ...session.headers,
+        },
         redirect: "error",
       });
       if (!response.ok) throw new Error(`Источник: HTTP ${response.status}`);
       const text = await response.text();
       if (text.length > 20_000_000)
         throw new Error("Ответ источника слишком большой");
-      return JSON.parse(text);
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new Error("Источник вернул некорректный JSON");
+      }
     });
     await mkdir(cacheDir, { recursive: true });
     await writeFile(file + ".tmp", JSON.stringify({ at: Date.now(), value }));
@@ -100,11 +111,11 @@ export async function json(path: string, ttl = 300_000): Promise<any> {
     await pruneCache().catch(() => {});
     return value;
   })();
-  pending.set(path, task);
+  pending.set(requestKey, task);
   try {
     return await task;
   } finally {
-    pending.delete(path);
+    pending.delete(requestKey);
   }
 }
 export function parseBoards(data: any): Board[] {

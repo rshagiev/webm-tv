@@ -9,7 +9,7 @@ const fixture = {version:1,boards:{test:{at:Date.now(),topics:{'1':{topic:{id:'1
 fixture.boards.test.topics['2'] = {topic:{...fixture.boards.test.topics['1'].topic,id:'2'},clips:[],checkedAt:0};
 const {createHash} = await import('node:crypto');
 await mkdir(join(isolatedData,'cache'));
-await writeFile(join(isolatedData,'cache',createHash('sha256').update('https://2ch.hk/index.json').digest('hex')+'.json'),JSON.stringify({at:Date.now(),value:{boards:[{id:'test',name:'Test',category:'Test',file_types:[]}]}}));
+await writeFile(join(isolatedData,'cache',createHash('sha256').update('https://2ch.hk/index.json:anonymous').digest('hex')+'.json'),JSON.stringify({at:Date.now(),value:{boards:[{id:'test',name:'Test',category:'Test',file_types:[]}]}}));
 await writeFile(join(isolatedData,'library.json'), JSON.stringify(fixture));
 const child=spawn(process.execPath,['--import','tsx','server/index.ts'],{env:{...process.env, WEBMTV_DATA_DIR: isolatedData,HOST:'127.0.0.1',PUBLIC_ORIGIN:'https://webmtv.example'},stdio:['ignore','pipe','pipe']});
 let output='';child.stdout.on('data',b=>output+=b);child.stderr.on('data',b=>output+=b);

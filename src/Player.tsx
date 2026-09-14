@@ -22,6 +22,7 @@ import type { Clip } from "../shared/model";
 import { useStored } from "./storage";
 import { swipeRelease } from "./swipe";
 import { canWarmNeighbor } from "./media-buffer";
+import { playbackUrl } from "../shared/media";
 import { watchDelta, type Observation, type Reason } from "./preferences";
 export type PlayerHandle = {
   start: (clip?: Clip) => void;
@@ -232,7 +233,7 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
     if (urls.current[index] !== c.url) {
       urls.current[index] = c.url;
       v.preload = "auto";
-      v.src = c.url;
+      v.src = playbackUrl(c.url);
     } else {
       if (v.error) v.load();
       try {
@@ -280,7 +281,7 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
       v.muted = true;
       urls.current[index] = url;
       v.preload = "auto";
-      v.src = url;
+      v.src = playbackUrl(url);
     }
     // Release irrelevant files when a source changes; never fetch an archive.
     for (let i = 0; i < 3; i++)

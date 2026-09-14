@@ -27,6 +27,8 @@ import {
   type RadioBatch,
 } from "../shared/radio.js";
 import { validClipAddress } from "../shared/share.js";
+import { registerRecovery } from "./source-recovery.js";
+import { registerMedia } from "./media.js";
 const snapshots = new Snapshots();
 function sendSnapshot<T>(
   req: FastifyRequest,
@@ -95,6 +97,7 @@ function batch(
 }
 const app = Fastify({
   requestTimeout: 15_000,
+  trustProxy: publicOrigin ? "127.0.0.1" : false,
   connectionTimeout: 10_000,
   logger: process.env.LOG_REQUESTS === "1",
   bodyLimit: 32_768,
@@ -141,6 +144,8 @@ app.setErrorHandler((e, _req, reply) =>
 const version = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url), "utf8"),
 ).version;
+registerMedia(app);
+registerRecovery(app);
 const shutdownToken = randomUUID();
 let revision = "local";
 try {
