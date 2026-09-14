@@ -9,6 +9,7 @@ export type Board = VideoAvailability & {
   category: string;
   adult: boolean;
   threads: number;
+  activity?: number;
   video: boolean;
 };
 export type Topic = VideoAvailability & {

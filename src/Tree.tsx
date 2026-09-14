@@ -264,7 +264,8 @@ export function Tree({
                               void load(b.id);
                             },
                             `/${b.id}/ · ${b.videoCount ? b.videoCount + " видео" : b.videoState === "empty" ? "без видео" : "проверяем"}`,
-                            !!b.videoCount,
+                            !!b.videoCount ||
+                              (showAll && !minimum && b.videoState !== "empty"),
                           )}
                           {(expanded.has(key) ||
                             (!!query &&
@@ -319,7 +320,10 @@ export function Tree({
                                       : t.videoState === "empty"
                                         ? "без видео"
                                         : "ещё проверяем",
-                                    !!t.videoCount,
+                                    !!t.videoCount ||
+                                      (showAll &&
+                                        !minimum &&
+                                        t.videoState !== "empty"),
                                   ),
                                 )}
                               {list &&
@@ -329,9 +333,12 @@ export function Tree({
                                     t.videoState === "unknown" ||
                                     t.videoState === "error",
                                 ) && (
-                                  <div className="tree-note scan-note">
-                                    Остальные треды проверяем в фоне
-                                  </div>
+                                  <button
+                                    className="tree-note scan-note"
+                                    onClick={() => setShowAll(true)}
+                                  >
+                                    Показать непроверенные треды
+                                  </button>
                                 )}
                               {list &&
                                 list.every((t) => t.videoState === "empty") && (

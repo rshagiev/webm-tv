@@ -422,7 +422,11 @@ export default function App() {
               threadsDone: 0,
               threadsTotal: 0,
               errors: 0,
-              done: false,
+              done:
+                sources.length === 1 &&
+                selected.source.kind === "thread" &&
+                !d.pending &&
+                d.clips.length === 0,
               cancelled: false,
               updated: Date.now(),
             },

@@ -4,6 +4,8 @@ export type Entry = {
   topic: Topic;
   clips: Clip[];
   checkedAt: number;
+  stale?: boolean;
+  discoveredAt?: number;
   error?: string;
 };
 export type BoardEntry = { at: number; topics: Record<string, Entry> };
@@ -30,7 +32,9 @@ export class VideoLibrary {
                 (unchanged && old.checkedAt) || old?.clips.length
                   ? old.clips
                   : byThread.get(topic.id) || [],
-              checkedAt: unchanged ? old.checkedAt : 0,
+              checkedAt: old?.checkedAt || 0,
+              stale: !unchanged || !!old?.stale,
+              discoveredAt: old?.discoveredAt || now,
               error: old?.error,
             },
           ];
@@ -54,6 +58,8 @@ export class VideoLibrary {
       topic,
       clips: [...new Map(clips.map((c) => [c.id, c])).values()],
       checkedAt: now,
+      stale: false,
+      discoveredAt: previous?.discoveredAt || now,
     };
   }
   failure(board: string, id: string, message: string) {
@@ -72,7 +78,7 @@ export class VideoLibrary {
           ? "ready"
           : e.error
             ? "error"
-            : e.checkedAt
+            : e.checkedAt && !e.stale
               ? "empty"
               : "unknown",
         samples: clips.slice(0, 2),

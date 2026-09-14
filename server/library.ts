@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { boards, catalog, thread } from "./source.js";
+import { CrawlQueue, catalogInterval } from "./crawl-queue.js";
 import { VideoLibrary } from "./library-state.js";
 import type { Clip, Topic, Board } from "../shared/model.js";
 const dataDir = resolve(process.env.WEBMTV_DATA_DIR || "data");
@@ -58,78 +59,86 @@ export function rememberThread(board: string, id: string, clips: Clip[]) {
   persist();
 }
 let touched = 0,
-  running = false,
-  round = 0;
-const priority = new Set<string>();
+  running = false;
+const queue = new CrawlQueue();
 const retryAfter = new Map<string, number>();
-export function warmLibrary(board?: string) {
+export function warmLibrary(board?: string, threadId?: string) {
   touched = Date.now();
-  if (board) priority.add(board);
+  if (board) queue.request(board, threadId, touched);
   if (!running) {
     running = true;
-    void warm().finally(() => {
-      running = false;
-    });
+    void warm()
+      .catch((error) => console.error("Index crawl failed:", error.message))
+      .finally(() => {
+        running = false;
+      });
   }
 }
 async function warm() {
   await libraryReady;
-  let registry: Board[] = [];
-  try {
-    registry = (await boards()).filter((b) => b.video);
-  } catch {
-    return;
-  }
+  let registry: Board[] = [],
+    registryAt = 0,
+    turns = 0;
   while (
     Date.now() - touched <
     (process.env.PUBLIC_ORIGIN ? 180_000 : 25_000)
   ) {
-    const now = Date.now();
-    const nextBoard = registry.find(
-      (b) =>
-        (!library.data[b.id]?.at || now - library.data[b.id].at > 600_000) &&
-        (retryAfter.get(b.id) || 0) < now,
-    );
+    let now = Date.now();
+    if (!registryAt || now - registryAt >= 60_000) {
+      try {
+        registry = (await boards()).filter((b) => b.video);
+        registryAt = now;
+      } catch {
+        if (!registry.length) return;
+        registryAt = now;
+      }
+    }
+    for (const [key, until] of retryAfter)
+      if (until <= now) retryAfter.delete(key);
+    const missing = registry.some((b) => !library.data[b.id]?.at);
+    const nextBoard =
+      missing || turns++ % 3 === 0
+        ? registry
+            .filter(
+              (b) =>
+                (retryAfter.get(b.id) || 0) <= now &&
+                (!library.data[b.id]?.at ||
+                  now - library.data[b.id].at >= catalogInterval(b)),
+            )
+            .sort((a, b) => {
+              const overdue = (x: Board) =>
+                library.data[x.id]?.at
+                  ? (now - library.data[x.id].at) / catalogInterval(x)
+                  : Infinity;
+              return overdue(b) - overdue(a) || a.id.localeCompare(b.id);
+            })[0]
+        : undefined;
     if (nextBoard) {
       try {
-        rememberCatalog(nextBoard.id, await catalog(nextBoard.id));
-      } catch {
-        retryAfter.set(nextBoard.id, now + 60_000);
-      }
-    }
-    const ordered = [
-      ...registry.filter((b) => priority.has(b.id)),
-      ...registry.slice(round),
-      ...registry.slice(0, round),
-    ];
-    let found = false;
-    for (const b of ordered) {
-      const entries = Object.values(library.data[b.id]?.topics || {})
-        .filter(
-          (e) =>
-            (!e.checkedAt || now - e.checkedAt > 900_000) &&
-            (retryAfter.get(b.id + ":" + e.topic.id) || 0) < now,
-        )
-        .sort(
-          (a, b) =>
-            Number(!!a.checkedAt) - Number(!!b.checkedAt) ||
-            b.topic.opVideos - a.topic.opVideos,
+        rememberCatalog(
+          nextBoard.id,
+          await catalog(nextBoard.id, catalogInterval(nextBoard)),
         );
-      const e = entries[0];
-      if (!e) {
-        priority.delete(b.id);
-        continue;
+      } catch {
+        retryAfter.set(nextBoard.id, Date.now() + 60_000);
       }
-      try {
-        rememberThread(b.id, e.topic.id, await thread(b.id, e.topic.id));
-      } catch (error) {
-        library.failure(b.id, e.topic.id, (error as Error).message);
-        retryAfter.set(b.id + ":" + e.topic.id, now + 60_000);
-      }
-      round = (registry.findIndex((x) => x.id === b.id) + 1) % registry.length;
-      found = true;
-      break;
     }
-    await new Promise((r) => setTimeout(r, nextBoard || found ? 350 : 3000));
+    now = Date.now();
+    const task = queue.pick(library.data, registry, retryAfter, now);
+    if (task) {
+      const { board, entry } = task;
+      try {
+        rememberThread(
+          board,
+          entry.topic.id,
+          await thread(board, entry.topic.id, 60_000),
+        );
+      } catch (error) {
+        library.failure(board, entry.topic.id, (error as Error).message);
+        persist();
+        retryAfter.set(board + ":" + entry.topic.id, Date.now() + 60_000);
+      }
+    }
+    await new Promise((r) => setTimeout(r, nextBoard || task ? 350 : 3000));
   }
 }

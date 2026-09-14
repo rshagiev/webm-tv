@@ -4,7 +4,11 @@ export const RADIO_BATCH_SIZE = 96;
 export const RADIO_LOW_WATER = 24;
 export const RADIO_POOL_LIMIT = 400;
 export const PUBLIC_MINIMUMS = [0, 60, 180, 300, 600];
-export type RadioBatch = { clips: Clip[]; complete: boolean };
+export type RadioBatch = {
+  clips: Clip[];
+  complete: boolean;
+  pending?: boolean;
+};
 export function radioPath(
   source: Source,
   bucket: number,

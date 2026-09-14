@@ -80,7 +80,14 @@ function batch(
         minimum,
         new Set(),
       );
-      return { clips, complete: clips.length < 96 };
+      const entry =
+        source.kind === "thread"
+          ? library.data[source.board!]?.topics[source.id]
+          : undefined;
+      const pending =
+        source.kind === "thread" &&
+        (!entry?.checkedAt || !!entry.stale || !!entry.error);
+      return { clips, complete: clips.length < 96, pending };
     },
     Date.now(),
     (value) => (value.clips.length ? 60_000 : 5000),
@@ -261,12 +268,10 @@ app.get<{ Params: { board: string; thread: string; file: string } }>(
       (c) => new URL(c.url).pathname.split("/").pop() === file,
     );
     if (!clip)
-      return reply
-        .code(404)
-        .send({
-          error:
-            "Ролик больше не доступен в каталоге. Можно посмотреть общий эфир.",
-        });
+      return reply.code(404).send({
+        error:
+          "Ролик больше не доступен в каталоге. Можно посмотреть общий эфир.",
+      });
     reply.header("Cache-Control", "public, max-age=60");
     return {
       clip,
@@ -308,7 +313,10 @@ app.get<{
   await libraryReady;
   if (source.kind === "thread" && !library.data[board]?.topics[thread])
     return reply.code(404).send({ error: "Тред ещё не найден в каталоге" });
-  warmLibrary(source.kind === "board" ? source.id : source.board);
+  warmLibrary(
+    source.kind === "board" ? source.id : source.board,
+    source.kind === "thread" ? source.id : undefined,
+  );
   return sendSnapshot(
     req,
     reply,

@@ -118,6 +118,7 @@ export function parseBoards(data: any): Board[] {
       category: plain(b.category) || "Без категории",
       adult: b.category === "Взрослым",
       threads: Number(b.threads) || 0,
+      activity: Math.max(0, Math.min(1_000_000, Number(b.speed) || 0)),
       video: (b.file_types || []).some(
         (x: string) => x === "webm" || x === "mp4",
       ),
@@ -131,7 +132,7 @@ export async function boards(): Promise<Board[]> {
   if (registryPending) return registryPending;
   registryPending = (async () => {
     try {
-      registry = parseBoards(await json("/index.json", 3600_000));
+      registry = parseBoards(await json("/index.json", 300_000));
       registryUntil = Date.now() + 60_000;
       return registry;
     } catch (error) {
@@ -186,9 +187,9 @@ export function extract(
     }),
   );
 }
-export async function catalog(board: string) {
+export async function catalog(board: string, ttl = 300_000) {
   if (!/^[a-z0-9_]+$/.test(board)) throw new Error("Invalid board");
-  const data = await json(`/${board}/catalog.json`);
+  const data = await json(`/${board}/catalog.json`, ttl);
   if (!Array.isArray(data.threads)) throw new Error("Каталог недоступен");
   const topics: Topic[] = data.threads.map((t: any) => ({
     id: String(t.num),
@@ -207,10 +208,10 @@ export async function catalog(board: string) {
   );
   return { topics, clips };
 }
-export async function thread(board: string, id: string) {
+export async function thread(board: string, id: string, ttl = 300_000) {
   if (!/^[a-z0-9_]+$/.test(board) || !/^\d+$/.test(id))
     throw new Error("Invalid thread");
-  const data = await json(`/${board}/res/${id}.json`);
+  const data = await json(`/${board}/res/${id}.json`, ttl);
   if (!Array.isArray(data.threads))
     throw new Error("Тред недоступен или удалён");
   const posts = data.threads.flatMap((t: any) => t.posts || []);
