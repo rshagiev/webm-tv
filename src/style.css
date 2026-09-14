@@ -974,21 +974,6 @@ footer {
   background: #151b20dd;
   backdrop-filter: blur(12px);
 }
-.thread-focus {
-  font-size: 11px;
-  color: #d4966f;
-  padding: 8px 0 0;
-  justify-content: flex-start;
-}
-.thread-focus:hover {
-  background: none !important;
-  color: var(--accent) !important;
-}
-.return-stream {
-  font-size: 11px;
-  color: #a1aeb6;
-  padding: 4px 0 10px;
-}
 .player > video:first-child {
   transition:
     transform 0.16s ease-out,
@@ -1182,15 +1167,6 @@ footer {
     font-size: 14px;
     line-height: 1.45;
     color: #f3f4f4;
-  }
-  .shorts-caption button {
-    font-size: 11px;
-    color: #e4bda0;
-    margin-top: 9px;
-    padding: 0;
-    min-height: 30px;
-    gap: 3px;
-    text-shadow: 0 1px 8px #000;
   }
   .shorts-actions {
     display: flex;
@@ -1562,3 +1538,17 @@ footer {
 .audience-stats dt { font-size: 11px; color: #a2adb4; }
 .audience-stats dd { margin: 8px 0 0; font-size: 19px; font-variant-numeric: tabular-nums; }
 .system-dialog { max-height: calc(100dvh - 32px); overflow-y: auto; }
+
+/* The same thread toggle stays visible in both feed modes. */
+.thread-focus, .shorts-caption .thread-focus {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  width: fit-content; min-height: 32px; margin-top: 9px; padding: 6px 10px;
+  border: 1px solid #626b71; border-radius: 8px; background: #20262999;
+  color: #b7c0c6; font-size: 12px; font-weight: 500; line-height: 18px;
+  text-shadow: none;
+}
+.thread-focus svg { flex-shrink: 0; }
+.thread-focus:hover { background: #2b3338; border-color: #899299; color: #e6e7e8; }
+.thread-focus[aria-pressed="true"] { color: #f4aa79; border-color: #bc815c; background: #f4aa790d; }
+.thread-focus[aria-pressed="true"]:hover { background: #f4aa791c; border-color: #f4aa79; }
+.thread-focus:focus-visible { outline: 2px solid #f4aa79; outline-offset: 3px; }

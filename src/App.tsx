@@ -814,8 +814,14 @@ export default function App() {
       thread: { board: c.board, thread: c.thread, title: c.title },
     });
   };
+  const inCurrentThread = selection.kind === "thread" &&
+    selection.board === clip?.board && selection.id === clip?.thread;
   const stayInThread = () => {
-    if (!clip || selection.kind === "thread") return;
+    if (!clip) return;
+    if (inCurrentThread) {
+      choose(returnSource?.selection || ROOT, returnSource?.sources || [ROOT], clip);
+      return;
+    }
     const previous = { selection, sources };
     const thread: Source = {
       kind: "thread",
@@ -1172,11 +1178,11 @@ export default function App() {
                 <div className="shorts-caption">
                   <span>/{clip.board}/</span>
                   <p>{clip.title}</p>
-                  {selection.kind !== "thread" && (
-                    <button onClick={stayInThread}>
-                      Смотреть этот тред <ChevronRight size={14} />
-                    </button>
-                  )}
+                  <button className="thread-focus" aria-pressed={inCurrentThread} onClick={stayInThread}
+                    title={inCurrentThread ? `Вернуться: ${returnSource?.selection.label || ROOT.label}` : undefined}>
+                    {inCurrentThread ? "Смотрим этот тред" : "Смотреть этот тред"}
+                    {inCurrentThread ? <Check size={14} /> : <ChevronRight size={14} />}
+                  </button>
                 </div>
                 <div className="shorts-actions">
                   <button
@@ -1216,11 +1222,11 @@ export default function App() {
                   /{clip.board}/ <span>· {clip.title}</span>
                   <ExternalLink size={16} />
                 </a>
-                {selection.kind !== "thread" && (
-                  <button className="thread-focus" onClick={stayInThread}>
-                    Смотреть этот тред <ChevronRight size={13} />
-                  </button>
-                )}
+                <button className="thread-focus" aria-pressed={inCurrentThread} onClick={stayInThread}
+                  title={inCurrentThread ? `Вернуться: ${returnSource?.selection.label || ROOT.label}` : undefined}>
+                  {inCurrentThread ? "Смотрим этот тред" : "Смотреть этот тред"}
+                  {inCurrentThread ? <Check size={14} /> : <ChevronRight size={14} />}
+                </button>
                 <div className="clip-detail">
                   {clip.width} × {clip.height} ·{" "}
                   {clip.url.toLowerCase().includes(".webm") ? "WEBM" : "MP4"}
@@ -1294,17 +1300,6 @@ export default function App() {
             </button>
           </div>
         </div>
-        {returnSource && (
-          <button
-            className="return-stream"
-            onClick={() => {
-              choose(returnSource.selection, returnSource.sources);
-              setReturnSource(null);
-            }}
-          >
-            ← Вернуться: {returnSource.selection.label}
-          </button>
-        )}
         <div className="feed-status" aria-live="polite">
           {p ? (
             <>
