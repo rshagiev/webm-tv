@@ -42,8 +42,10 @@ import { radioPath, RADIO_LOW_WATER, type RadioBatch } from "../shared/radio";
 import { mergeRadioPool, RefillCursor } from "./radio-pool";
 import { clipPath, sharedClipApi } from "../shared/share";
 import { playbackHistory, emptyHistory } from "./playback-history";
+import { takeReload, RELOAD_KEY } from "./reload-session";
 const ROOT: Source = { kind: "root", id: "all", label: "Весь Двач" };
 export default function App() {
+  const [reloadSession] = useState(takeReload);
   const [publicMode, setPublicMode] = useState<boolean | null>(null);
   const modeRef = useRef(publicMode);
   modeRef.current = publicMode;
@@ -86,8 +88,12 @@ export default function App() {
   const filterMinimum = onlyLong ? minimum : 0;
   const [boards, setBoards] = useState<Board[]>([]),
     [treeError, setTreeError] = useState("");
-  const [selection, setSelection] = useState<Source>(ROOT),
-    [sources, setSources] = useState<Source[]>([ROOT]);
+  const [selection, setSelection] = useState<Source>(
+      reloadSession?.selection || ROOT,
+    ),
+    [sources, setSources] = useState<Source[]>(
+      reloadSession?.sources || [ROOT],
+    );
   const [includeAdult, setAdult] = useStored("includeAdult", false);
   const [collections, setCollections] = useStored<Collection[]>(
     "collections",
@@ -99,15 +105,17 @@ export default function App() {
     [name, setName] = useState(""),
     [drawer, setDrawer] = useState<"sources" | "saved" | null>(null),
     [mobile, setMobile] = useState(false);
-  const [started, setStarted] = useState(false),
+  const [started, setStarted] = useState(!!reloadSession),
     [revision, setRevision] = useState(0),
     [feed, setFeed] = useState<Feed | null>(null),
     [rawClips, setClips] = useState<Clip[]>([]),
     [error, setError] = useState(""),
-    [wantPlay, setWantPlay] = useState(false);
+    [wantPlay, setWantPlay] = useState(reloadSession?.playing || false);
   const [{ history, position }, dispatchHistory] = useReducer(
     playbackHistory,
-    emptyHistory,
+    reloadSession
+      ? { history: reloadSession.history, position: reloadSession.position }
+      : emptyHistory,
   );
   const [toast, setToast] = useState("");
   const seen = useRef(new Set(read<string[]>("seen", [])));
@@ -115,17 +123,64 @@ export default function App() {
   const failures = useRef(0);
   const waitingForMore = useRef(false);
   const clip = history[position];
+  const reloadState = useRef({
+    history,
+    position,
+    selection,
+    sources,
+    started,
+    wantPlay,
+  });
+  reloadState.current = {
+    history,
+    position,
+    selection,
+    sources,
+    started,
+    wantPlay,
+  };
+  useEffect(() => {
+    const checkpoint = () => {
+      try {
+        const s = reloadState.current;
+        const media = playerRef.current?.checkpoint();
+        if (
+          !s.started ||
+          !s.history[s.position] ||
+          media?.url !== s.history[s.position].url
+        ) {
+          sessionStorage.removeItem(RELOAD_KEY);
+          return;
+        }
+        sessionStorage.setItem(
+          RELOAD_KEY,
+          JSON.stringify({
+            at: Date.now(),
+            path: location.pathname,
+            history: s.history,
+            position: s.position,
+            selection: s.selection,
+            sources: s.sources,
+            time: media.time,
+            playing: s.wantPlay,
+          }),
+        );
+      } catch {}
+    };
+    window.addEventListener("pagehide", checkpoint);
+    return () => window.removeEventListener("pagehide", checkpoint);
+  }, []);
   const [sharedClip, setSharedClip] = useState<{
     clip: Clip;
     adult: boolean;
   }>();
   const [sharedLoading, setSharedLoading] = useState(
-    location.pathname.startsWith("/watch/"),
+    !reloadSession && location.pathname.startsWith("/watch/"),
   );
   const [sharedError, setSharedError] = useState("");
   const sharedRequest = useRef<AbortController | null>(null);
   useEffect(() => {
-    if (!location.pathname.startsWith("/watch/")) return;
+    if (reloadSession || !location.pathname.startsWith("/watch/")) return;
     const path = sharedClipApi(location.pathname);
     if (!path) {
       setSharedError("Некорректная ссылка на ролик");
@@ -941,6 +996,14 @@ export default function App() {
             </div>
           )}
           <Player
+            resume={
+              reloadSession
+                ? {
+                    url: reloadSession.history[reloadSession.position].url,
+                    time: reloadSession.time,
+                  }
+                : undefined
+            }
             ref={playerRef}
             clip={clip}
             preload={

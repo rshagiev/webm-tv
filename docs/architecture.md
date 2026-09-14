@@ -89,3 +89,7 @@ Tests cover one-post semantics across repeated requests and process reconstructi
 ## Unified source tree
 
 The tree has one mode: include unread branches, hide fully checked empty branches. With a duration filter, only branches with matching videos remain visible. `indexState` is independent of video availability and duration: pending until every current thread is read and fresh, error if a read failed, complete otherwise. The muted spinner represents unfinished checking, not a guarantee of an active request at that instant; the check mark represents a fully checked snapshot. Category status includes all its boards, including those outside the search result.
+
+## Quick reload recovery
+
+On pagehide only, the current tab writes a bounded playback snapshot to sessionStorage: history/cursor, selected sources, current active media time, and playback intent. No timeupdate persistence or periodic tracking is added. Initialization consumes a same-path snapshot no older than five minutes; malformed, expired, or other-path snapshots are discarded. The player applies the saved offset once, on metadata for the matching clip, clamps it to duration, and drops the pending seek when the selected clip changes. Paused playback stays paused; browser autoplay rules still apply to playing snapshots. This is reload recovery, not durable watch history or crash recovery.

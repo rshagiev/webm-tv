@@ -25,6 +25,7 @@ import { canWarmNeighbor } from "./media-buffer";
 import { playbackUrl } from "../shared/media";
 import { watchDelta, type Observation, type Reason } from "./preferences";
 export type PlayerHandle = {
+  checkpoint: () => { url: string; time: number };
   start: (clip?: Clip) => void;
   hold: () => void;
   mute: () => void;
@@ -32,6 +33,7 @@ export type PlayerHandle = {
   feedback: (reason: Reason) => void;
 };
 type Props = {
+  resume?: { url: string; time: number };
   clip?: Clip;
   preload?: Clip;
   previousClip?: Clip;
@@ -53,6 +55,7 @@ type Props = {
 export const Player = forwardRef<PlayerHandle, Props>(function Player(
   {
     clip,
+    resume,
     preload,
     previousClip,
     wantPlay,
@@ -72,6 +75,7 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
   },
   ref,
 ) {
+  const resumePending = useRef(resume);
   const video = useRef<HTMLVideoElement>(null),
     frame = useRef<HTMLDivElement>(null);
   const slots = useRef<(HTMLVideoElement | null)[]>([null, null, null]);
@@ -337,6 +341,13 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
       });
   };
   useImperativeHandle(ref, () => ({
+    checkpoint: () => ({
+      url: loaded.current,
+      time:
+        resumePending.current?.url === loaded.current
+          ? resumePending.current.time
+          : video.current?.currentTime || 0,
+    }),
     mute: () => sound(volume && !needsSound ? 0 : lastVolume.current),
     fullscreen,
     feedback,
@@ -358,6 +369,8 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
     },
   }));
   useLayoutEffect(() => {
+    if (resumePending.current?.url !== clip?.url)
+      resumePending.current = undefined;
     if (clip) {
       setSource(clip);
       if (wanted.current) attempt();
@@ -706,8 +719,27 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
               };
             }}
             onLoadedMetadata={() => {
-              if (index === activeSlot.current)
-                setDuration(video.current?.duration || 0);
+              if (index !== activeSlot.current) return;
+              const v = video.current;
+              setDuration(v?.duration || 0);
+              const restore = resumePending.current;
+              if (
+                v &&
+                restore &&
+                loaded.current === restore.url &&
+                Number.isFinite(v.duration)
+              ) {
+                v.currentTime = Math.min(
+                  restore.time,
+                  Math.max(0, v.duration - 0.1),
+                );
+                setTime(v.currentTime);
+                lastTick.current = {
+                  media: v.currentTime,
+                  wall: performance.now(),
+                };
+                resumePending.current = undefined;
+              }
             }}
             onEnded={() => {
               if (index !== activeSlot.current) return;
