@@ -222,7 +222,18 @@ export function Tree({
           </small>
         </button>
         {thread && (
-          <details className="thread-menu" name="thread-actions">
+          <details
+            className="thread-menu"
+            name="thread-actions"
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === "Escape") {
+                e.preventDefault();
+                e.currentTarget.open = false;
+                e.currentTarget.querySelector("summary")?.focus();
+              }
+            }}
+          >
             <summary
               aria-label={`Действия треда ${source.label}`}
               title="Действия треда"

@@ -1653,7 +1653,11 @@ export default function App() {
         />
       </dialog>
       {threadNotice && (
-        <div className="toast thread-notice" role="status">
+        <div
+          className="toast thread-notice"
+          role="status"
+          onKeyDown={(e) => e.stopPropagation()}
+        >
           <span>
             {threadNotice.kind === "hidden"
               ? "Ролик скрыт"
