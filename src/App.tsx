@@ -1144,6 +1144,11 @@ export default function App() {
               position < history.length - 1 ? history[position + 1] : prepared
             }
             previousClip={position > 0 ? history[position - 1] : undefined}
+            stopAtEnd={
+              !!clip &&
+              location.pathname.startsWith("/watch/") &&
+              location.pathname === clipPath(clip)
+            }
             wantPlay={wantPlay}
             setWantPlay={play}
             next={next}

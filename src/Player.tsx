@@ -38,6 +38,7 @@ type Props = {
   preload?: Clip;
   previousClip?: Clip;
   wantPlay: boolean;
+  stopAtEnd?: boolean;
   setWantPlay: (v: boolean) => void;
   next: () => void;
   previous: () => void;
@@ -59,6 +60,7 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
     preload,
     previousClip,
     wantPlay,
+    stopAtEnd = false,
     setWantPlay,
     next,
     previous,
@@ -744,7 +746,10 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player(
             onEnded={() => {
               if (index !== activeSlot.current) return;
               feedback("ended");
-              next();
+              if (stopAtEnd) {
+                wanted.current = false;
+                setWantPlay(false);
+              } else next();
             }}
             onError={() => {
               if (index !== activeSlot.current) {
