@@ -1536,3 +1536,9 @@ footer {
 .settings-button-confirm:hover:not(:disabled) { background: #ffad73; border-color: #ffad73; color: #23170f; }
 .settings-button-confirm:active:not(:disabled) { background: #eb8843; color: #23170f; }
 @media (max-width: 360px) { .settings-reset-buttons { grid-template-columns: 1fr; } }
+
+.audience-stats { border-bottom: 1px solid #343c41; padding-bottom: 4px; }
+.audience-stats dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
+.audience-stats dt { font-size: 11px; color: #a2adb4; }
+.audience-stats dd { margin: 8px 0 0; font-size: 19px; font-variant-numeric: tabular-nums; }
+.system-dialog { max-height: calc(100dvh - 32px); overflow-y: auto; }

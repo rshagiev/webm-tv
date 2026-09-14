@@ -29,6 +29,7 @@ import {
 import { validClipAddress } from "../shared/share.js";
 import { registerRecovery } from "./source-recovery.js";
 import { registerMedia } from "./media.js";
+import { registerAudience } from "./audience.js";
 const snapshots = new Snapshots();
 function sendSnapshot<T>(
   req: FastifyRequest,
@@ -146,6 +147,7 @@ const version = JSON.parse(
 ).version;
 registerMedia(app);
 registerRecovery(app);
+await registerAudience(app, resolve(process.env.WEBMTV_DATA_DIR || "data"));
 const shutdownToken = randomUUID();
 let revision = "local";
 try {

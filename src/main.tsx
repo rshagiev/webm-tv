@@ -2,6 +2,10 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import { SourceAccess } from "./SourceAccess";
 import "./style.css";
+import { startAudience } from "./audience";
+if (location.pathname !== "/restore-access") {
+  startAudience();
+}
 createRoot(document.getElementById("root")!).render(
   location.pathname === "/restore-access" ? (
     <main className="restore-page">

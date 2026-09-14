@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Info, Power, X, Copy, Check } from "lucide-react";
 import { api } from "./api";
+import { AudienceStats } from "./AudienceStats";
 
 type SystemInfo = {
   public?: boolean;
@@ -148,6 +149,7 @@ export function SystemControls({
         ) : (
           <>
             <p className="system-version">Версия {info?.version || "…"}</p>
+            {panel === "info" && <AudienceStats />}
             {info?.public ? (
               <>
                 <label>Адрес сайта</label>
