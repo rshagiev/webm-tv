@@ -242,7 +242,23 @@ export default function App() {
     }, 15000);
     api<{ clip: Clip; adult: boolean }>(path, { signal: controller.signal })
       .then((value) => {
-        if (!controller.signal.aborted) setSharedClip(value);
+        if (controller.signal.aborted) return;
+        if (value.adult) {
+          setSharedClip(value);
+          return;
+        }
+        const c = value.clip;
+        if (!allowed(c)) {
+          setSharedError(
+            "Этот тред исключён из вашего эфира. Вернуть его можно в Источниках.",
+          );
+          return;
+        }
+        knownClips.current.set(c.id, c);
+        markSeen(c);
+        dispatchHistory({ type: "reset", clip: c });
+        setStarted(true);
+        setWantPlay(true);
       })
       .catch((e) => {
         if (!controller.signal.aborted) setSharedError(e.message);

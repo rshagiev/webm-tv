@@ -4,7 +4,7 @@ import { origin } from "./source.js";
 import { sourceSession } from "./source-session.js";
 import { validMediaPath } from "../shared/media.js";
 
-async function sourceMedia(
+export async function sourceMedia(
   path: string,
   method: string,
   headers: Record<string, string>,

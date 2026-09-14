@@ -30,6 +30,7 @@ import { validClipAddress } from "../shared/share.js";
 import { registerRecovery } from "./source-recovery.js";
 import { registerMedia } from "./media.js";
 import { registerAudience } from "./audience.js";
+import { registerSharePages } from "./share-page.js";
 const snapshots = new Snapshots();
 function sendSnapshot<T>(
   req: FastifyRequest,
@@ -436,6 +437,19 @@ app.delete<{ Params: { id: string } }>("/api/feeds/:id", async (req) => {
   if (j) j.stopped = true;
   jobs.delete(req.params.id);
   return { ok: true };
+});
+registerSharePages(app, {
+  publicOrigin: publicOrigin || undefined,
+  html: () => readFileSync(resolve("dist/index.html"), "utf8"),
+  find: async ({ board, thread, file }) => {
+    await libraryReady;
+    const entry = Object.hasOwn(library.data, board)
+      ? library.data[board]
+      : undefined;
+    return entry?.topics[thread]?.clips.find(
+      (c) => new URL(c.url).pathname.split("/").pop() === file,
+    );
+  },
 });
 await app.register(fastifyStatic, { root: resolve("dist"), wildcard: true });
 app.setNotFoundHandler((req, reply) =>
