@@ -9,7 +9,7 @@ import {
   Layers,
   LoaderCircle,
   CircleAlert,
-  Ellipsis,
+  EllipsisVertical,
 } from "lucide-react";
 import type { Board, Source, Topic, Collection, Clip } from "../shared/model";
 import { sourceKey } from "../shared/model";
@@ -169,21 +169,76 @@ export function Tree({
         style={{ paddingLeft: 12 + level * 14 }}
         key={key}
       >
-        {children ? (
-          <button
-            className="disclosure"
-            aria-label={`Раскрыть ${source.label}`}
-            aria-expanded={expanded.has(key)}
-            onClick={action}
+        {thread && (
+          <details
+            className="thread-menu"
+            name="thread-actions"
+            onToggle={(e) => {
+              const menu = e.currentTarget;
+              if (!menu.open) return;
+              const trigger = menu
+                .querySelector("summary")!
+                .getBoundingClientRect();
+              const bounds = menu
+                .closest(".tree-scroller")!
+                .getBoundingClientRect();
+              menu.dataset.above = String(
+                trigger.bottom + 96 >
+                  Math.min(bounds.bottom, window.innerHeight),
+              );
+              menu.style.setProperty(
+                "--thread-menu-width",
+                `${Math.min(214, bounds.right - trigger.left - 8)}px`,
+              );
+            }}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === "Escape") {
+                e.preventDefault();
+                e.currentTarget.open = false;
+                e.currentTarget.querySelector("summary")?.focus();
+              }
+            }}
           >
-            <ChevronRight
-              size={14}
-              className={expanded.has(key) ? "rotated" : ""}
-            />
-          </button>
-        ) : (
-          <span className="leaf-dot" />
+            <summary aria-label={`Действия треда ${source.label}`}>
+              <EllipsisVertical size={14} />
+            </summary>
+            <div>
+              <button
+                onClick={(e) => {
+                  e.currentTarget.closest("details")!.open = false;
+                  excluded ? restoreThread(thread) : excludeThread(thread);
+                }}
+              >
+                {excluded ? "Вернуть в мой эфир" : "Исключить из моего эфира"}
+              </button>
+              <button
+                onClick={(e) => {
+                  e.currentTarget.closest("details")!.open = false;
+                  toggle(source);
+                }}
+              >
+                {added ? "Убрать из подборки" : "Добавить в подборку"}
+              </button>
+            </div>
+          </details>
         )}
+        {!thread &&
+          (children ? (
+            <button
+              className="disclosure"
+              aria-label={`Раскрыть ${source.label}`}
+              aria-expanded={expanded.has(key)}
+              onClick={action}
+            >
+              <ChevronRight
+                size={14}
+                className={expanded.has(key) ? "rotated" : ""}
+              />
+            </button>
+          ) : (
+            <span className="leaf-dot" />
+          ))}
         <button
           className="tree-label"
           title={source.label}
@@ -221,45 +276,6 @@ export function Tree({
             </span>
           </small>
         </button>
-        {thread && (
-          <details
-            className="thread-menu"
-            name="thread-actions"
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (e.key === "Escape") {
-                e.preventDefault();
-                e.currentTarget.open = false;
-                e.currentTarget.querySelector("summary")?.focus();
-              }
-            }}
-          >
-            <summary
-              aria-label={`Действия треда ${source.label}`}
-              title="Действия треда"
-            >
-              <Ellipsis size={16} />
-            </summary>
-            <div>
-              <button
-                onClick={(e) => {
-                  e.currentTarget.closest("details")!.open = false;
-                  excluded ? restoreThread(thread) : excludeThread(thread);
-                }}
-              >
-                {excluded ? "Вернуть в мой эфир" : "Исключить из моего эфира"}
-              </button>
-              <button
-                onClick={(e) => {
-                  e.currentTarget.closest("details")!.open = false;
-                  toggle(source);
-                }}
-              >
-                {added ? "Убрать из подборки" : "Добавить в подборку"}
-              </button>
-            </div>
-          </details>
-        )}
         {playable && !thread && (
           <button
             className={`add-source ${added ? "added" : ""}`}

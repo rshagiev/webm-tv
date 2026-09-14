@@ -1370,27 +1370,29 @@ export default function App() {
                   Учимся по досмотрам и пропускам. История интересов хранится
                   только в этом браузере.
                 </p>
-                <button
-                  className="quiet"
-                  onClick={() => {
-                    playerRef.current?.feedback("leave");
-                    profile.current = {};
-                    save("interests-v1", {});
-                    setPrepared(undefined);
-                    setToast("Интересы сброшены");
-                  }}
-                >
-                  Сбросить интересы
-                </button>
-                <button
-                  className="quiet reset-settings"
-                  onClick={() => {
-                    setResetError("");
-                    resetDialog.current?.showModal();
-                  }}
-                >
-                  Сбросить настройки
-                </button>
+                <div className="settings-reset-buttons">
+                  <button
+                    className="settings-button"
+                    onClick={() => {
+                      playerRef.current?.feedback("leave");
+                      profile.current = {};
+                      save("interests-v1", {});
+                      setPrepared(undefined);
+                      setToast("Интересы сброшены");
+                    }}
+                  >
+                    Сбросить интересы
+                  </button>
+                  <button
+                    className="settings-button"
+                    onClick={() => {
+                      setResetError("");
+                      resetDialog.current?.showModal();
+                    }}
+                  >
+                    Сбросить настройки
+                  </button>
+                </div>
                 <p className="muted">
                   Категория → доска → тред. Название включает эфир, стрелка
                   раскрывает ветку.
@@ -1608,10 +1610,15 @@ export default function App() {
         <p>Закладки сохранятся. Сброс действует только в этом браузере.</p>
         {resetError && <p role="alert">{resetError}</p>}
         <div className="reset-actions">
-          <button autoFocus onClick={() => resetDialog.current?.close()}>
+          <button
+            className="settings-button"
+            autoFocus
+            onClick={() => resetDialog.current?.close()}
+          >
             Отмена
           </button>
           <button
+            className="settings-button settings-button-confirm"
             onClick={() => {
               try {
                 resetting.current = true;
