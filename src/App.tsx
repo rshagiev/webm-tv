@@ -1383,7 +1383,7 @@ export default function App() {
                   Сбросить интересы
                 </button>
                 <button
-                  className="quiet"
+                  className="quiet reset-settings"
                   onClick={() => {
                     setResetError("");
                     resetDialog.current?.showModal();

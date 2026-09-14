@@ -1526,3 +1526,5 @@ footer {
 .tree-row:has(.thread-menu[open]) { padding-bottom: 86px; }
 
 .reset-actions { display: flex; justify-content: flex-end; gap: 16px; }
+
+.reset-settings { display: block; margin-top: 12px; }

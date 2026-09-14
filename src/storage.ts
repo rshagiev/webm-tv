@@ -17,3 +17,13 @@ export function useStored<T>(key: string, fallback: T) {
   useEffect(() => save(key, value), [key, value]);
   return [value, set] as const;
 }
+
+// Bookmarks are deliberate saves, so a settings reset keeps them.
+export function resetSettings(storage: Storage = localStorage) {
+  const keys = Array.from({ length: storage.length }, (_, i) => storage.key(i));
+  for (const key of keys) {
+    if (key?.startsWith("webmtv:") && key !== "webmtv:saved") {
+      storage.removeItem(key);
+    }
+  }
+}
